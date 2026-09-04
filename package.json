@@ -91,7 +91,7 @@
     "vinext": "^0.0.31",
     "vite": "^7.0.0",
     "vitest": "^3.2.4",
-    "wrangler": "^4.77.0"
+    "wrangler": "^4.127.1"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs,json,md,yml,yaml}": [
