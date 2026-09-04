@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/lib/feature-flags.ts",
+    "src/lib/request-context.ts",
+    "src/lib/route-guards.ts"
+  ],
+  "out": "docs/reference",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "readme": "none"
+}

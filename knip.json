@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "include": ["dependencies", "exports", "types"],
+  "exclude": ["binaries"],
+  "ignore": [".next/**", "node_modules/**", "drizzle/**"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": [],
+  "ignoreUnresolved": [
+    "AvatarGroup",
+    "AvatarGroupCount",
+    "AvatarBadge",
+    "DialogClose",
+    "SheetClose",
+    "SheetFooter",
+    "isAdminByKnownId",
+    "isAdminUserId",
+    "getTaskStatusLabel",
+    "getFirstThirtyDayChecklist",
+    "Session"
+  ],
+  "next": {
+    "entry": "src/app/**/*.{ts,tsx}",
+    "project": "src/**/*.{ts,tsx}"
+  }
+}

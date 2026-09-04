@@ -1,0 +1,14 @@
+services:
+  app:
+    image: node:22
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: sh -lc "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"

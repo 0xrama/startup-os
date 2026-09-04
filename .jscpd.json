@@ -1,0 +1,17 @@
+{
+  "threshold": 2,
+  "minLines": 20,
+  "minTokens": 120,
+  "reporters": ["console"],
+  "ignore": [
+    "**/.next/**",
+    "**/.superpowers/**",
+    "**/.worktrees/**",
+    "**/coverage/**",
+    "**/docs/reference/**",
+    "**/node_modules/**",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/bun.lock"
+  ]
+}

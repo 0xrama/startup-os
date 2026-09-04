@@ -1,0 +1,32 @@
+name = "pax"
+compatibility_date = "2026-03-18"
+compatibility_flags = ["nodejs_compat"]
+main = "vinext/server/app-router-entry"
+
+[vars]
+# Replace these example URLs and the all-zero D1 ID before remote deployment.
+NEXT_PUBLIC_APP_URL = "https://startup-os.example.com"
+BETTER_AUTH_URL = "https://startup-os.example.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "startupos"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "drizzle"
+
+# Optional: enable this only after the bucket exists and you switch code to use
+# a native Workers R2 binding. The current app talks to R2 through S3-compatible
+# credentials from secrets, so this binding is not required for deploys.
+#
+# [[r2_buckets]]
+# binding = "R2_BUCKET"
+# bucket_name = "pax"
+# preview_bucket_name = "pax-dev"
+
+# Optional: enable this after you create the Vectorize index named
+# "pax-knowledge". Until then, the app falls back to D1-backed retrieval.
+#
+# [[vectorize]]
+# binding = "VECTORIZE"
+# index_name = "pax-knowledge"
+# remote = true

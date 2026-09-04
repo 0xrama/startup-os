@@ -1,0 +1,4 @@
+coverage
+docs/reference
+node_modules
+.next
