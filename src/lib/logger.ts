@@ -1,10 +1,5 @@
 type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 type LogContext = Record<string, unknown>;
 type LogLevel = "info" | "warn" | "error";

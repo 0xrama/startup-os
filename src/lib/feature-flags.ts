@@ -1,8 +1,5 @@
 export type FeatureFlagName =
-  | "analytics"
-  | "assistantRetrieval"
-  | "marketingExperiment"
-  | "requestMetrics";
+  "analytics" | "assistantRetrieval" | "marketingExperiment" | "requestMetrics";
 
 const FEATURE_FLAG_ENV = {
   analytics: "NEXT_PUBLIC_FEATURE_ANALYTICS",

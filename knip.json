@@ -4,7 +4,7 @@
   "exclude": ["binaries"],
   "ignore": [".next/**", "node_modules/**", "drizzle/**"],
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": [],
+  "ignoreDependencies": ["cloudflare"],
   "ignoreUnresolved": [
     "AvatarGroup",
     "AvatarGroupCount",
