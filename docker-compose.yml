@@ -2,13 +2,38 @@ services:
   app:
     image: node:22
     working_dir: /workspace
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: local-development-secret-change-me
+      NEXT_PUBLIC_FEATURE_ANALYTICS: "false"
+      NEXT_PUBLIC_FEATURE_MARKETING_EXPERIMENT: "false"
+      FEATURE_ASSISTANT_RETRIEVAL: "false"
+      FEATURE_REQUEST_METRICS: "true"
+      R2_ENDPOINT: http://localhost:9000
+      R2_ACCESS_KEY_ID: local
+      R2_SECRET_ACCESS_KEY: local
+      R2_BUCKET_NAME: startup-os-local
     volumes:
       - .:/workspace
-    command: sh -lc "npm install && npm run dev"
+      - app_node_modules:/workspace/node_modules
+      - app_wrangler_state:/workspace/.wrangler
+    command: >-
+      sh -lc "corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm exec wrangler d1 migrations apply startupos --local --config wrangler.toml &&
+      pnpm dev -- --hostname 0.0.0.0"
     ports:
       - "3000:3000"
+    depends_on:
+      - mailpit
   mailpit:
     image: axllent/mailpit:latest
     ports:
       - "1025:1025"
       - "8025:8025"
+
+volumes:
+  app_node_modules:
+  app_wrangler_state:
