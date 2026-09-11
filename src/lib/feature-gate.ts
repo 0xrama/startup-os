@@ -36,7 +36,8 @@ export async function getUserPlan(userId: string): Promise<Plan> {
   });
 
   if (!sub || sub.status !== "active") return null;
-  return (sub.plan as Plan) ?? null;
+
+  return sub.plan ?? null;
 }
 
 async function getDocumentCount(userId: string) {
@@ -44,12 +45,17 @@ async function getDocumentCount(userId: string) {
     .select({ value: count() })
     .from(documents)
     .where(eq(documents.userId, userId));
+
   return value;
 }
 
 async function getAssistantMessageCountForUser(userId: string) {
   const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const monthStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+  );
+
   const conversations = await db.query.chatConversations.findMany({
     where: eq(chatConversations.userId, userId),
     columns: { id: true },
@@ -60,6 +66,7 @@ async function getAssistantMessageCountForUser(userId: string) {
   }
 
   const ids = new Set(conversations.map((conversation) => conversation.id));
+
   const messages = await db.query.chatMessages.findMany({
     where: gte(chatMessages.createdAt, monthStart),
     columns: { role: true, conversationId: true },
@@ -81,6 +88,7 @@ async function getCollaboratorCount(userId: string) {
   }
 
   const llcIds = new Set(ownedLlcs.map((llc) => llc.id));
+
   const collaborators = await db.query.llcCollaborators.findMany({
     where: or(
       eq(llcCollaborators.status, "pending"),
@@ -89,7 +97,8 @@ async function getCollaboratorCount(userId: string) {
     columns: { llcId: true },
   });
 
-  return collaborators.filter((collaborator) => llcIds.has(collaborator.llcId)).length;
+  return collaborators.filter((collaborator) => llcIds.has(collaborator.llcId))
+    .length;
 }
 
 async function getLlcCount(userId: string) {
@@ -97,6 +106,7 @@ async function getLlcCount(userId: string) {
     .select({ value: count() })
     .from(llcs)
     .where(eq(llcs.userId, userId));
+
   return value;
 }
 
@@ -124,6 +134,7 @@ export async function checkFeatureAccess(
   switch (feature) {
     case "documents": {
       const currentUsage = await getDocumentCount(userId);
+
       if (currentUsage >= limits.maxDocuments) {
         return {
           allowed: false,
@@ -133,10 +144,13 @@ export async function checkFeatureAccess(
           limit: limits.maxDocuments,
         };
       }
+
       return { allowed: true, currentUsage, limit: limits.maxDocuments };
     }
+
     case "assistant": {
       const currentUsage = await getAssistantMessageCountForUser(userId);
+
       if (currentUsage >= limits.maxAssistantQueries) {
         return {
           allowed: false,
@@ -146,8 +160,10 @@ export async function checkFeatureAccess(
           limit: limits.maxAssistantQueries,
         };
       }
+
       return { allowed: true, currentUsage, limit: limits.maxAssistantQueries };
     }
+
     case "whatsapp":
       if (!limits.whatsappReminders) {
         return {
@@ -156,6 +172,7 @@ export async function checkFeatureAccess(
           reason: "WhatsApp reminders are available on the Pro plan.",
         };
       }
+
       return { allowed: true };
     case "collaborators": {
       if (!limits.collaborators) {
@@ -165,9 +182,12 @@ export async function checkFeatureAccess(
           reason: "Collaborators are available on the Pro plan.",
         };
       }
+
       const currentUsage = await getCollaboratorCount(userId);
+
       return { allowed: true, currentUsage };
     }
+
     case "notice-triage":
       return limits.noticeTriage
         ? { allowed: true }
@@ -186,6 +206,7 @@ export async function checkFeatureAccess(
           };
     case "llcs": {
       const currentUsage = await getLlcCount(userId);
+
       if (currentUsage >= limits.maxLlcs) {
         return {
           allowed: false,
@@ -195,6 +216,7 @@ export async function checkFeatureAccess(
           limit: limits.maxLlcs,
         };
       }
+
       return { allowed: true, currentUsage, limit: limits.maxLlcs };
     }
   }
@@ -204,6 +226,8 @@ export function getUpgradeStatusCode(result: {
   code?: "plan_required" | "limit_reached" | "feature_locked";
 }) {
   if (result.code === "plan_required") return 402;
+
   if (result.code === "limit_reached") return 429;
+
   return 403;
 }

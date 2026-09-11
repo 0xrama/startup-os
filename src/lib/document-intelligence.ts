@@ -73,6 +73,7 @@ async function extractTextFromDocument(
 
   if (fileType === "application/pdf") {
     const parsed = await pdfParse(bytes);
+
     return parsed.text.trim();
   }
 
@@ -81,6 +82,7 @@ async function extractTextFromDocument(
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   ) {
     const parsed = await mammoth.extractRawText({ buffer: bytes });
+
     return parsed.value.trim();
   }
 
@@ -95,6 +97,7 @@ async function extractTextFromDocument(
   if (fileType?.startsWith("image/")) {
     const mimeType = fileType;
     const base64 = bytes.toString("base64");
+
     const result = await generateObject({
       model: openai("gpt-4o-mini"),
       schema: z.object({
@@ -113,6 +116,7 @@ async function extractTextFromDocument(
         },
       ],
     });
+
     return result.object.text.trim();
   }
 
@@ -158,6 +162,7 @@ export async function processDocumentIntelligence(documentId: string) {
         updatedAt: new Date(),
       })
       .where(eq(documents.id, documentId));
+
     return;
   }
 
@@ -175,6 +180,7 @@ export async function processDocumentIntelligence(documentId: string) {
       doc.fileKey,
       doc.fileType
     );
+
     const extracted = await classifyExtractedText(extractedText);
     const textPreview = extractedText.slice(0, 500);
 
@@ -222,6 +228,7 @@ export async function processDocumentIntelligence(documentId: string) {
       const existing = await db.query.noticeCases.findFirst({
         where: eq(noticeCases.documentId, documentId),
       });
+
       const payload = {
         documentId: doc.id,
         llcId: doc.llcId,

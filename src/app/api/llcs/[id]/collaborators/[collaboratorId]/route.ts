@@ -11,13 +11,31 @@ export async function PATCH(
 ) {
   try {
     const context = await requireApiContext({ feature: "collaborators" });
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id, collaboratorId } = await params;
-    const access = await requireApiLlcAccess(session.user.id, id, { manageable: true });
+
+    const access = await requireApiLlcAccess(session.user.id, id, {
+      manageable: true,
+    });
+
     if ("response" in access) return access.response;
 
     const { role, status } = await request.json();
+
+    if (
+      role !== undefined &&
+      role !== null &&
+      role !== "owner" &&
+      role !== "editor" &&
+      role !== "viewer"
+    ) {
+      return NextResponse.json(
+        { error: "Role must be one of owner, editor, or viewer" },
+        { status: 400 }
+      );
+    }
 
     const [updated] = await db
       .update(llcCollaborators)
@@ -49,7 +67,12 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to update collaborator" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to update collaborator",
+      },
       { status: 500 }
     );
   }
@@ -61,10 +84,15 @@ export async function DELETE(
 ) {
   try {
     const context = await requireApiContext({ feature: "collaborators" });
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id, collaboratorId } = await params;
-    const access = await requireApiLlcAccess(session.user.id, id, { manageable: true });
+
+    const access = await requireApiLlcAccess(session.user.id, id, {
+      manageable: true,
+    });
+
     if ("response" in access) return access.response;
 
     const [removed] = await db
@@ -92,7 +120,12 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to remove collaborator" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to remove collaborator",
+      },
       { status: 500 }
     );
   }

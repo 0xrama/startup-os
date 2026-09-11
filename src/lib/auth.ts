@@ -3,8 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import * as schema from "./schema";
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+function isNonEmptyString(value: string | null | undefined): value is string {
+  return value !== null && value !== undefined && value.trim().length > 0;
 }
 
 function getUrlHost(value: string) {

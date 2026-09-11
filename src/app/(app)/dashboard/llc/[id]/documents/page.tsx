@@ -89,13 +89,16 @@ const CATEGORIES = [
 ];
 
 const CATEGORY_LABELS = Object.fromEntries(
-  CATEGORIES.map((category) => [category.value, category.label])
-) as Record<string, string>;
+  CATEGORIES.map((category) => [category.value, category.label] as const)
+);
 
 function formatSize(bytes: number | null) {
   if (!bytes) return "—";
+
   if (bytes < 1024) return `${bytes} B`;
+
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -109,16 +112,23 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
   const [notices, setNotices] = useState<NoticeCase[]>([]);
+
   const [documentIntelligenceEnabled, setDocumentIntelligenceEnabled] =
     useState(false);
+
   const [noticeTriageEnabled, setNoticeTriageEnabled] = useState(false);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   const fetchDocs = useCallback(async () => {
     try {
       const res = await fetch(`/api/llcs/${llcId}/documents`);
+
       if (!res.ok) return;
+
+      // SAFETY: the documents route returns Document rows from the owned
+      // /api/llcs/[id]/documents handler.
       const data = (await res.json()) as Array<Document>;
+
       if (masterKey) {
         const decryptedDocs = await Promise.all(
           data.map(async (doc) => {
@@ -147,7 +157,9 @@ export default function DocumentsPage() {
             }
           })
         );
+
         setDocs(decryptedDocs);
+
         return;
       }
 
@@ -164,7 +176,11 @@ export default function DocumentsPage() {
   useEffect(() => {
     void fetch(`/api/llcs/${llcId}/notices`)
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setNotices(data as NoticeCase[]))
+      .then((data) => {
+        // SAFETY: the notices endpoint returns NoticeCase rows from the owned
+        // /api/llcs/[id]/notices handler.
+        setNotices(data as NoticeCase[]);
+      })
       .catch(() => undefined);
   }, [llcId]);
 
@@ -172,6 +188,8 @@ export default function DocumentsPage() {
     void fetch("/api/billing/status", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        // SAFETY: /api/billing/status is owned by this app and serializes the
+        // BillingStatus shape defined beside its route handler.
         const status = data as BillingStatus | null;
         setDocumentIntelligenceEnabled(
           Boolean(status?.limits?.documentIntelligence)
@@ -188,6 +206,7 @@ export default function DocumentsPage() {
     try {
       setGateMessage(null);
       const encryptedFile = await encryptDocumentBlob(masterKey, selectedFile);
+
       const encryptedMetadata = await encryptJson(masterKey, {
         fileName: selectedFile.name,
         fileType: selectedFile.type,
@@ -236,6 +255,7 @@ export default function DocumentsPage() {
           const processData = await processRes.json().catch(() => ({
             error: "Document processing is unavailable right now.",
           }));
+
           setGateMessage(
             processData.error ?? "Document processing is unavailable right now."
           );
@@ -282,6 +302,9 @@ export default function DocumentsPage() {
 
     if (!res.ok) return;
 
+    // SAFETY: the decrypt endpoint returns exactly these fields for the
+    // requested document; wrappedFileKey/encryptedMetadata are CipherPayload
+    // rows or null per the documents schema.
     const {
       downloadUrl,
       wrappedFileKey,
@@ -300,10 +323,12 @@ export default function DocumentsPage() {
 
     if (!wrappedFileKey || !fileIv) {
       window.open(downloadUrl, "_blank");
+
       return;
     }
 
     const encryptedBlobResponse = await fetch(downloadUrl);
+
     if (!encryptedBlobResponse.ok) throw new Error("Failed to download file");
 
     const decryptedBlob = await decryptDocumentBlob(
@@ -322,6 +347,7 @@ export default function DocumentsPage() {
         fileType: string;
         category?: string;
       }>(masterKey, encryptedMetadata);
+
       resolvedName = metadata.fileName;
       resolvedType = metadata.fileType;
     }
@@ -329,6 +355,7 @@ export default function DocumentsPage() {
     const objectUrl = URL.createObjectURL(
       new Blob([decryptedBlob], { type: resolvedType })
     );
+
     const anchor = document.createElement("a");
     anchor.href = objectUrl;
     anchor.download = resolvedName;
@@ -340,6 +367,7 @@ export default function DocumentsPage() {
     if (!confirm("Delete this document?")) return;
 
     const res = await fetch(`/api/documents/${docId}`, { method: "DELETE" });
+
     if (res.ok) {
       setDocs((prev) => prev.filter((d) => d.id !== docId));
     }
@@ -385,6 +413,7 @@ export default function DocumentsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {CATEGORIES.map((c) => {
                     const Icon = c.icon;
+
                     return (
                       <button
                         key={c.value}
@@ -505,6 +534,7 @@ export default function DocumentsPage() {
           <div className="space-y-2">
             {docs.map((doc) => {
               const Icon = getDocumentIcon(doc.fileType, doc.category);
+
               return (
                 <div
                   key={doc.id}

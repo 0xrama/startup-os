@@ -48,6 +48,8 @@ export function CollaboratorsPanel({
         throw new Error(data.error || "Invite failed");
       }
 
+      // SAFETY: the invite route returns the collaborator row it just
+      // inserted, serialized from the llcCollaborators schema.
       const collaborator = (await res.json()) as Collaborator;
       setCollaborators((prev) => [...prev, collaborator]);
       setEmail("");
@@ -127,6 +129,7 @@ export function CollaboratorsPanel({
                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
                   {(() => {
                     const Icon = getCollaboratorStatusIcon(collaborator.status);
+
                     return <Icon className="h-4 w-4" />;
                   })()}
                 </div>

@@ -33,11 +33,11 @@ export async function DELETE() {
   const userId = sess.user.id;
 
   const subscription = await getUserSubscription(userId);
+
   if (hasActiveSubscription(subscription)) {
     return NextResponse.json(
       {
-        error:
-          "Please cancel your subscription before deleting your account.",
+        error: "Please cancel your subscription before deleting your account.",
       },
       { status: 400 }
     );
@@ -48,6 +48,7 @@ export async function DELETE() {
     .select({ id: llcs.id })
     .from(llcs)
     .where(eq(llcs.userId, userId));
+
   const llcIds = userLlcs.map((l) => l.id);
 
   // Get user's conversation IDs
@@ -55,6 +56,7 @@ export async function DELETE() {
     .select({ id: chatConversations.id })
     .from(chatConversations)
     .where(eq(chatConversations.userId, userId));
+
   const convoIds = userConvos.map((c) => c.id);
 
   await db.transaction(async (tx) => {
@@ -64,6 +66,7 @@ export async function DELETE() {
         .delete(chatMessages)
         .where(inArray(chatMessages.conversationId, convoIds));
     }
+
     await tx
       .delete(chatConversations)
       .where(eq(chatConversations.userId, userId));
@@ -77,7 +80,9 @@ export async function DELETE() {
         .select({ id: complianceTasks.id })
         .from(complianceTasks)
         .where(inArray(complianceTasks.llcId, llcIds));
+
       const taskIds = taskRows.map((t) => t.id);
+
       if (taskIds.length > 0) {
         await tx.delete(reminders).where(inArray(reminders.taskId, taskIds));
       }

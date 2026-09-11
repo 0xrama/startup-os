@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const context = await requireApiContext({ feature: "assistant" });
+
     if ("response" in context) return context.response;
     const { session } = context;
 
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
 
     if (llcId) {
       const llcAccess = await getLlcAccess(session.user.id, llcId);
+
       if (!llcAccess) {
         return new Response("LLC not found", { status: 404 });
       }
@@ -55,8 +57,9 @@ export async function POST(request: NextRequest) {
     });
 
     const history = await getConversationMessages(conversation.id);
+
     const priorMessages = history.map((entry) => ({
-      role: entry.role as "user" | "assistant",
+      role: entry.role,
       content: entry.content ?? "",
     }));
 
@@ -67,7 +70,9 @@ export async function POST(request: NextRequest) {
           limit: 4,
         })
       : [];
+
     const citations = retrieval.map(toCitation);
+
     const localRetrievalContext = retrieval.length
       ? `Relevant source-backed context:\n${retrieval
           .map(
@@ -78,6 +83,7 @@ export async function POST(request: NextRequest) {
             "\n\n"
           )}\nAlways cite the supporting source when using this context.`
       : "";
+
     const finalRetrievalContext =
       localRetrievalContext ||
       "No source-backed context was retrieved for this message. Be conservative and say when guidance is not source-backed.";
@@ -113,13 +119,15 @@ export async function POST(request: NextRequest) {
     });
 
     incrementMetric("assistant_requests_total");
+
     return response;
   } catch (error) {
     incrementMetric("assistant_errors_total");
     logger.error("Assistant request failed", {
       requestId,
-      error,
+      error: error instanceof Error ? error : String(error),
     });
+
     return new Response(
       error instanceof Error ? error.message : "Assistant error",
       {

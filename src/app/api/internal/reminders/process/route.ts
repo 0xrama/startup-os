@@ -8,5 +8,6 @@ export async function POST(request: NextRequest) {
   }
 
   const count = await processPendingReminders();
+
   return NextResponse.json({ processed: count });
 }

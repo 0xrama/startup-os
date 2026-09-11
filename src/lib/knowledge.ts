@@ -48,12 +48,15 @@ const embeddingModel = openai.embedding("text-embedding-3-small");
 
 export function chunkText(content: string, size = 1200) {
   const normalized = content.replace(/\s+/g, " ").trim();
+
   if (!normalized) return [];
 
   const chunks: string[] = [];
+
   for (let index = 0; index < normalized.length; index += size) {
     chunks.push(normalized.slice(index, index + size));
   }
+
   return chunks;
 }
 
@@ -62,6 +65,7 @@ export async function embedText(content: string) {
     model: embeddingModel,
     value: content,
   });
+
   return embedding;
 }
 
@@ -148,7 +152,7 @@ export async function storeKnowledgeChunks({
       const chunkMetadata: KnowledgeChunkMetadata = {
         ...metadata,
         section:
-          typeof metadata.section === "string"
+          metadata.section !== undefined
             ? `${metadata.section} · chunk ${index + 1}`
             : `chunk ${index + 1}`,
       };
@@ -158,7 +162,7 @@ export async function storeKnowledgeChunks({
         source,
         sourceId: sourceId ?? null,
         content,
-        embedding: (await embedText(content)) as number[],
+        embedding: await embedText(content),
         metadata: chunkMetadata,
       };
     })
@@ -170,14 +174,14 @@ export async function storeKnowledgeChunks({
         id: value.id,
         source: value.source,
         content: value.content,
-        embedding: value.embedding ?? [],
+        embedding: value.embedding,
         metadata: value.metadata,
       })),
     });
   } catch (error) {
     logger.error("Vectorize upsert failed", {
-      sourceId,
-      error,
+      sourceId: sourceId ?? null,
+      error: error instanceof Error ? error : String(error),
     });
   }
 
@@ -196,7 +200,7 @@ export async function syncKnowledgeChunksToVectorize(args: {
         const metadata: KnowledgeChunkMetadata = {
           ...args.metadata,
           section:
-            typeof args.metadata.section === "string"
+            args.metadata.section !== undefined
               ? `${args.metadata.section} · chunk ${index + 1}`
               : `chunk ${index + 1}`,
         };
@@ -205,7 +209,7 @@ export async function syncKnowledgeChunksToVectorize(args: {
           id: toChunkId(args.sourceId, index),
           source: args.source,
           content,
-          embedding: (await embedText(content)) as number[],
+          embedding: await embedText(content),
           metadata,
         };
       })
@@ -214,8 +218,8 @@ export async function syncKnowledgeChunksToVectorize(args: {
     await upsertKnowledgeChunksToVectorize({ values });
   } catch (error) {
     logger.error("Vectorize sync failed", {
-      sourceId: args.sourceId,
-      error,
+      sourceId: args.sourceId ?? null,
+      error: error instanceof Error ? error : String(error),
     });
   }
 }
@@ -231,7 +235,7 @@ export async function deleteKnowledgeChunksBySource(sourceId: string) {
   } catch (error) {
     logger.error("Vectorize delete failed", {
       sourceId,
-      error,
+      error: error instanceof Error ? error : String(error),
     });
   }
 
@@ -250,6 +254,7 @@ async function searchKnowledgeBaseInD1({
   limit: number;
 }) {
   const embedding = await embedText(query);
+
   const rows = await db
     .select({
       id: knowledgeChunks.id,
@@ -272,6 +277,7 @@ async function searchKnowledgeBaseInD1({
       }
 
       const metadata = row.metadata ?? {};
+
       return metadata.llcId == null || metadata.llcId === llcId;
     })
     .sort((a, b) => b.score - a.score);
@@ -280,7 +286,7 @@ async function searchKnowledgeBaseInD1({
     id: row.id,
     content: row.content,
     source: row.source,
-    metadata: (row.metadata ?? {}) as KnowledgeChunkMetadata,
+    metadata: row.metadata ?? {},
     score: row.score,
   }));
 }
@@ -297,6 +303,7 @@ export async function searchKnowledgeBase({
   if (isVectorizeEnabled()) {
     try {
       const embedding = await embedText(query);
+
       const matches = await queryKnowledgeVectors({
         embedding,
         namespaces: llcId ? [`llc:${llcId}`, "official"] : ["official"],
@@ -304,25 +311,18 @@ export async function searchKnowledgeBase({
       });
 
       if (matches) {
-        return matches.map((match) => {
-          const metadata = match.metadata as KnowledgeChunkMetadata & {
-            source?: string;
-            content?: string;
-          };
-
-          return {
-            id: match.id,
-            content: metadata.content ?? "",
-            source: metadata.source ?? metadata.title ?? "Knowledge base",
-            metadata,
-            score: match.score,
-          };
-        });
+        return matches.map((match) => ({
+          id: match.id,
+          content: match.metadata.content,
+          source: match.metadata.source,
+          metadata: match.metadata,
+          score: match.score,
+        }));
       }
     } catch (error) {
       logger.error("Vectorize query failed", {
-        llcId,
-        error,
+        llcId: llcId ?? null,
+        error: error instanceof Error ? error : String(error),
       });
     }
   }
@@ -340,8 +340,10 @@ export async function getDocumentSearchResults(llcId: string, query: string) {
   });
 
   const q = query.toLowerCase();
+
   return docs.filter((doc) => {
     const metadata = doc.extractedMetadata;
+
     return (
       doc.name.toLowerCase().includes(q) ||
       doc.category?.toLowerCase().includes(q) ||
@@ -353,21 +355,17 @@ export async function getDocumentSearchResults(llcId: string, query: string) {
 }
 
 export function toCitation(item: KnowledgeSearchResult): Citation {
-  const metadata = item.metadata as Record<string, unknown>;
-  const sourceType =
-    (metadata.kind as Citation["sourceType"] | undefined) ?? "irs";
-  const sourceTitle =
-    (metadata.title as string | undefined) ?? item.source ?? "Knowledge base";
+  const { metadata } = item;
+
+  const sourceTitle = metadata.title ?? item.source ?? "Knowledge base";
 
   return {
     label: sourceTitle,
-    sourceType,
+    sourceType: metadata.kind ?? "irs",
     sourceTitle,
     excerpt: item.content.slice(0, 240),
-    page: typeof metadata.page === "number" ? metadata.page : undefined,
-    section:
-      typeof metadata.section === "string" ? metadata.section : undefined,
-    documentId:
-      typeof metadata.documentId === "string" ? metadata.documentId : undefined,
+    page: metadata.page,
+    section: metadata.section,
+    documentId: metadata.documentId,
   };
 }

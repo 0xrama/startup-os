@@ -30,6 +30,7 @@ let r2Client: ReturnType<typeof createR2Client> | undefined;
 
 function getR2Client() {
   r2Client ??= createR2Client();
+
   return r2Client;
 }
 
@@ -41,38 +42,47 @@ export async function getUploadUrl(
   expiresIn = 300
 ) {
   const { client, PutObjectCommand, getSignedUrl } = await getR2Client();
+
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
     ContentType: contentType,
   });
+
   return getSignedUrl(client, command, { expiresIn });
 }
 
 export async function getDownloadUrl(key: string, expiresIn = 900) {
   const { client, GetObjectCommand, getSignedUrl } = await getR2Client();
+
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
   });
+
   return getSignedUrl(client, command, { expiresIn });
 }
 
 export async function getObjectBytes(key: string) {
   const { client, GetObjectCommand } = await getR2Client();
+
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
   });
+
   const response = await client.send(command);
+
   return Buffer.from(await response.Body!.transformToByteArray());
 }
 
 export async function deleteObject(key: string) {
   const { client, DeleteObjectCommand } = await getR2Client();
+
   const command = new DeleteObjectCommand({
     Bucket: BUCKET,
     Key: key,
   });
+
   return client.send(command);
 }

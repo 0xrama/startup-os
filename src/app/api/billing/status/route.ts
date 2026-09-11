@@ -27,9 +27,8 @@ export async function GET() {
 
   const subscription = await getUserSubscription(session.user.id);
   const isAdmin = await isAdminUser(session.user.id, session.user.email);
-  const plan = isAdmin
-    ? "pro"
-    : ((subscription?.plan as "starter" | "pro" | null) ?? null);
+
+  const plan = isAdmin ? "pro" : (subscription?.plan ?? null);
 
   return NextResponse.json({
     active: isAdmin || hasActiveSubscription(subscription),

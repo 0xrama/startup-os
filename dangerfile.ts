@@ -1,9 +1,11 @@
 import { danger, fail, message, warn } from "danger";
 
 const changedFiles = danger.git.modified_files.concat(danger.git.created_files);
+
 const changedSourceFiles = changedFiles.filter((file) =>
   file.startsWith("src/")
 );
+
 const changedTestFiles = changedFiles.filter((file) =>
   file.startsWith("tests/")
 );

@@ -60,6 +60,7 @@ async function getStatus(): Promise<EncryptionStatus> {
     if (response.status === 404 || response.status >= 500) {
       throw new Error("Failed to load encryption status");
     }
+
     return {
       configured: false,
       pinWrappedMasterKey: null,
@@ -93,11 +94,13 @@ function VaultSetup({
 
     if (!isValidPin(pin)) {
       setError("Use a 4 to 6 digit PIN.");
+
       return;
     }
 
     if (pin !== confirmPin) {
       setError("PIN confirmation does not match.");
+
       return;
     }
 
@@ -105,7 +108,11 @@ function VaultSetup({
       const code = await onSubmit(pin);
       setRecoveryCode(code);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to set up encryption");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Failed to set up encryption"
+      );
     }
   }
 
@@ -118,7 +125,8 @@ function VaultSetup({
         <div>
           <h2 className="heading-serif text-2xl">Set your vault PIN</h2>
           <p className="text-sm text-muted-foreground">
-            This PIN or the recovery code is required to unlock encrypted documents and private account data.
+            This PIN or the recovery code is required to unlock encrypted
+            documents and private account data.
           </p>
         </div>
       </div>
@@ -140,7 +148,9 @@ function VaultSetup({
               maxLength={6}
               type="password"
               value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(event) =>
+                setPin(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               placeholder="4 to 6 digits"
             />
           </div>
@@ -153,11 +163,17 @@ function VaultSetup({
               maxLength={6}
               type="password"
               value={confirmPin}
-              onChange={(event) => setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(event) =>
+                setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               placeholder="Repeat PIN"
             />
           </div>
-          <Button onClick={handleSubmit} disabled={loading} className="w-full btn-warm border-0">
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full btn-warm border-0"
+          >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -168,7 +184,12 @@ function VaultSetup({
             )}
           </Button>
           {onSkip ? (
-            <Button type="button" variant="secondary" onClick={onSkip} className="w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onSkip}
+              className="w-full"
+            >
               Continue without vault setup
             </Button>
           ) : null}
@@ -181,7 +202,8 @@ function VaultSetup({
             </p>
             <p className="mt-2 font-mono text-lg">{recoveryCode}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Save this now. If you lose both the PIN and this code, encrypted data cannot be recovered.
+              Save this now. If you lose both the PIN and this code, encrypted
+              data cannot be recovered.
             </p>
           </div>
           <Button
@@ -224,9 +246,14 @@ function VaultUnlock({
       } else {
         await onRecoveryUnlock(value);
       }
+
       setValue("");
     } catch (unlockError) {
-      setError(unlockError instanceof Error ? unlockError.message : "Unable to unlock vault");
+      setError(
+        unlockError instanceof Error
+          ? unlockError.message
+          : "Unable to unlock vault"
+      );
     }
   }
 
@@ -239,7 +266,8 @@ function VaultUnlock({
         <div>
           <h2 className="heading-serif text-2xl">Unlock encrypted vault</h2>
           <p className="text-sm text-muted-foreground">
-            Use your PIN or recovery code to decrypt private account data in this browser session.
+            Use your PIN or recovery code to decrypt private account data in
+            this browser session.
           </p>
         </div>
       </div>
@@ -261,7 +289,9 @@ function VaultUnlock({
         <Button
           type="button"
           variant={mode === "recovery" ? "default" : "secondary"}
-          className={mode === "recovery" ? "btn-warm border-0 flex-1" : "flex-1"}
+          className={
+            mode === "recovery" ? "btn-warm border-0 flex-1" : "flex-1"
+          }
           onClick={() => {
             setMode("recovery");
             setValue("");
@@ -280,19 +310,31 @@ function VaultUnlock({
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="vault-unlock-value">{mode === "pin" ? "PIN" : "Recovery code"}</Label>
+          <Label htmlFor="vault-unlock-value">
+            {mode === "pin" ? "PIN" : "Recovery code"}
+          </Label>
           <Input
             id="vault-unlock-value"
             type={mode === "pin" ? "password" : "text"}
             inputMode={mode === "pin" ? "numeric" : "text"}
             value={value}
             onChange={(event) =>
-              setValue(mode === "pin" ? event.target.value.replace(/\D/g, "").slice(0, 6) : event.target.value.toUpperCase())
+              setValue(
+                mode === "pin"
+                  ? event.target.value.replace(/\D/g, "").slice(0, 6)
+                  : event.target.value.toUpperCase()
+              )
             }
-            placeholder={mode === "pin" ? "4 to 6 digits" : "ABCD-EF12-3456-7890"}
+            placeholder={
+              mode === "pin" ? "4 to 6 digits" : "ABCD-EF12-3456-7890"
+            }
           />
         </div>
-        <Button onClick={handleUnlock} disabled={loading || !value} className="w-full btn-warm border-0">
+        <Button
+          onClick={handleUnlock}
+          disabled={loading || !value}
+          className="w-full btn-warm border-0"
+        >
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -303,7 +345,12 @@ function VaultUnlock({
           )}
         </Button>
         {onSkip ? (
-          <Button type="button" variant="secondary" onClick={onSkip} className="w-full">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onSkip}
+            className="w-full"
+          >
             Not now
           </Button>
         ) : null}
@@ -320,12 +367,18 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptMode, setPromptMode] = useState<"setup" | "unlock" | null>(null);
-  const [pendingRecoveryCode, setPendingRecoveryCode] = useState<string | null>(null);
+  const [pendingRecoveryCode, setPendingRecoveryCode] = useState<string | null>(
+    null
+  );
 
   async function refresh() {
     setLoading(true);
+
     try {
-      const [encryptionStatus, restoredMasterKey] = await Promise.all([getStatus(), restoreMasterKey()]);
+      const [encryptionStatus, restoredMasterKey] = await Promise.all([
+        getStatus(),
+        restoreMasterKey(),
+      ]);
       setStatus(encryptionStatus);
       setMasterKey(restoredMasterKey);
       setError(null);
@@ -356,9 +409,13 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
     try {
       const masterKeyValue = await generateMasterKey();
       const recoveryCode = generateRecoveryCode();
+
       const payload = {
         pinWrappedMasterKey: await wrapMasterKey(masterKeyValue, pin),
-        recoveryWrappedMasterKey: await wrapMasterKey(masterKeyValue, normalizeRecoveryCode(recoveryCode)),
+        recoveryWrappedMasterKey: await wrapMasterKey(
+          masterKeyValue,
+          normalizeRecoveryCode(recoveryCode)
+        ),
       };
 
       const response = await fetch("/api/account/encryption/setup", {
@@ -397,7 +454,10 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
     setBusy(true);
 
     try {
-      const unlockedKey = await unwrapMasterKey(status.pinWrappedMasterKey, pin);
+      const unlockedKey = await unwrapMasterKey(
+        status.pinWrappedMasterKey,
+        pin
+      );
       await persistMasterKey(unlockedKey);
       setMasterKey(unlockedKey);
       setPromptMode(null);
@@ -421,6 +481,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         status.recoveryWrappedMasterKey,
         normalizeRecoveryCode(recoveryCode)
       );
+
       await persistMasterKey(unlockedKey);
       setMasterKey(unlockedKey);
       setPromptMode(null);
@@ -438,8 +499,17 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   }
 
   const shouldAutoPrompt = pathname.includes("/documents") && !error;
-  const activePrompt =
-    pendingRecoveryCode ? "recovery" : promptMode ?? (shouldAutoPrompt ? (status?.configured ? (!masterKey ? "unlock" : null) : "setup") : null);
+
+  const activePrompt = pendingRecoveryCode
+    ? "recovery"
+    : (promptMode ??
+      (shouldAutoPrompt
+        ? status?.configured
+          ? !masterKey
+            ? "unlock"
+            : null
+          : "setup"
+        : null));
 
   const value: EncryptionContextValue = {
     available: !error,
@@ -470,9 +540,12 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
                   <Shield className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="heading-serif text-2xl">Save your recovery code</h2>
+                  <h2 className="heading-serif text-2xl">
+                    Save your recovery code
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    Without your PIN or this code, encrypted data is permanently inaccessible.
+                    Without your PIN or this code, encrypted data is permanently
+                    inaccessible.
                   </p>
                 </div>
               </div>
@@ -493,7 +566,10 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
                 >
                   Copy code
                 </Button>
-                <Button className="flex-1 btn-warm border-0" onClick={() => setPendingRecoveryCode(null)}>
+                <Button
+                  className="flex-1 btn-warm border-0"
+                  onClick={() => setPendingRecoveryCode(null)}
+                >
                   I saved it
                 </Button>
               </div>
@@ -506,7 +582,11 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
               loading={busy}
             />
           ) : (
-            <VaultSetup onSubmit={setupVault} onSkip={() => setPromptMode(null)} loading={busy} />
+            <VaultSetup
+              onSubmit={setupVault}
+              onSkip={() => setPromptMode(null)}
+              loading={busy}
+            />
           )}
         </div>
       ) : null}

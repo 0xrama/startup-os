@@ -5,6 +5,7 @@ import { createLogger } from "@/lib/logger";
 import { attachRequestId, resolveRequestId } from "@/lib/request-context";
 
 const logger = createLogger("auth-route");
+
 const handler = toNextJsHandler(auth);
 
 function getRequestPathname(request: Request) {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("Better Auth GET handler failed", {
       requestId,
-      error,
+      error: error instanceof Error ? error : String(error),
       pathname: getRequestPathname(request),
     });
 
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Better Auth POST handler failed", {
       requestId,
-      error,
+      error: error instanceof Error ? error : String(error),
       pathname: getRequestPathname(request),
     });
 

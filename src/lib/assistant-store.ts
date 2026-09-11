@@ -52,9 +52,11 @@ export async function ensureConversation({
 }) {
   if (conversationId) {
     const existing = await getConversation(userId, conversationId);
+
     if (!existing) {
       throw new Error("NOT_FOUND");
     }
+
     return existing;
   }
 
@@ -83,7 +85,7 @@ export async function createMessage({
   citations,
 }: {
   conversationId: string;
-  role: string;
+  role: "user" | "assistant";
   content?: string;
   requestId?: string;
   model?: string;

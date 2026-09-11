@@ -17,6 +17,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
+      - run: pnpm run lint:oxlint
       - run: pnpm run format
       - run: pnpm run test:ci
       - run: pnpm run knip

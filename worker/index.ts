@@ -12,11 +12,26 @@ import {
 } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
+/** Minimal Cloudflare Workers Fetcher binding shape. */
+interface Fetcher {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+}
+
+/** Options mirroring Cloudflare's image transform request shape. */
+interface ImageTransformOptions {
+  width?: number;
+  height?: number;
+  fit?: "scale-down" | "contain" | "cover" | "crop" | "pad";
+  format?: "json" | "jpeg" | "png" | "webp" | "avif";
+  quality?: number;
+  animate?: boolean;
+}
+
 interface Env {
   ASSETS: Fetcher;
   IMAGES: {
     input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
+      transform(options: ImageTransformOptions): {
         output(options: {
           format: string;
           quality: number;
@@ -50,6 +65,7 @@ const worker = {
     // normalizes backslashes and validates the origin hasn't changed.
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
+
       return handleImageOptimization(
         request,
         {
@@ -59,6 +75,7 @@ const worker = {
             const result = await env.IMAGES.input(body)
               .transform(width > 0 ? { width } : {})
               .output({ format, quality });
+
             return result.response();
           },
         },

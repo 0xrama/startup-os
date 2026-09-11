@@ -64,7 +64,9 @@ export default async function CalendarPage({
   // Sort: overdue first, then by due date
   const sorted = [...tasks].sort((a, b) => {
     if (a.status === "overdue" && b.status !== "overdue") return -1;
+
     if (b.status === "overdue" && a.status !== "overdue") return 1;
+
     return a.dueDate.localeCompare(b.dueDate);
   });
 
@@ -117,10 +119,13 @@ export default async function CalendarPage({
                       </div>
                     </div>
                     <div className="flex items-center gap-3 self-start sm:self-auto">
-                      <Badge variant={statusVariant(task.status)} className="text-xs">
+                      <Badge
+                        variant={statusVariant(task.status)}
+                        className="text-xs"
+                      >
                         {task.status}
                       </Badge>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap font-mono tabular-nums">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap font-mono tabular-nums">
                         {task.dueDate}
                       </span>
                     </div>

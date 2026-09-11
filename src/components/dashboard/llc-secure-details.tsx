@@ -26,11 +26,15 @@ export function LlcSecureDetails({
   encryptedData: CipherPayload | null;
   fallbackEin: string | null;
   fallbackRegisteredAgent: string | null;
-  fallbackMembers:
-    | Array<{ name: string; ownershipPct: number; country: string; taxIdType: string }>
-    | null;
+  fallbackMembers: Array<{
+    name: string;
+    ownershipPct: number;
+    country: string;
+    taxIdType: string;
+  }> | null;
 }) {
   const { masterKey } = useEncryption();
+
   const [secureData, setSecureData] = useState<SecurePayload | null>(
     fallbackEin || fallbackRegisteredAgent || fallbackMembers
       ? {
@@ -46,7 +50,11 @@ export function LlcSecureDetails({
       if (!masterKey || !encryptedData) return;
 
       try {
-        const value = await decryptJson<SecurePayload>(masterKey, encryptedData);
+        const value = await decryptJson<SecurePayload>(
+          masterKey,
+          encryptedData
+        );
+
         setSecureData(value);
       } catch {
         setSecureData(null);
@@ -63,9 +71,7 @@ export function LlcSecureDetails({
         <p className="font-medium font-mono">{secureData?.ein || "—"}</p>
       </div>
       <div>
-        <p className="text-muted-foreground text-xs mb-1">
-          Registered Agent
-        </p>
+        <p className="text-muted-foreground text-xs mb-1">Registered Agent</p>
         <p className="font-medium">{secureData?.registeredAgent || "—"}</p>
       </div>
 

@@ -24,23 +24,35 @@ import {
   isTaskVisible,
 } from "@/lib/compliance-task-details";
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORY_LABELS = {
   federal_tax: "Federal filing",
   state_tax: "State filing",
   annual_report: "Annual report",
   ra_renewal: "Registered agent",
   boi_report: "BOI",
   other: "Other",
-};
+} satisfies Record<string, string>;
+
+function getCategoryLabel(category: string | null | undefined) {
+  const entry = Object.entries(CATEGORY_LABELS).find(
+    ([key]) => key === category
+  );
+
+  return entry?.[1] ?? category ?? "Other";
+}
 
 type FilingDraft = {
   applicable: boolean;
   completed: boolean;
   checklist: NonNullable<ComplianceTaskMetadata["checklist"]>;
   filedAt: string;
-  filedMethod: NonNullable<NonNullable<ComplianceTaskMetadata["filing"]>["filedMethod"]> | "";
+  filedMethod:
+    | NonNullable<NonNullable<ComplianceTaskMetadata["filing"]>["filedMethod"]>
+    | "";
   acknowledgementStatus:
-    | NonNullable<NonNullable<ComplianceTaskMetadata["filing"]>["acknowledgementStatus"]>
+    | NonNullable<
+        NonNullable<ComplianceTaskMetadata["filing"]>["acknowledgementStatus"]
+      >
     | "";
   acknowledgementReference: string;
   notes: string;
@@ -80,7 +92,10 @@ function FilingCard({
       metadata: ComplianceTaskMetadata;
     }
   ) => Promise<void>;
-  onApplicabilityChange: (task: ComplianceTaskRecord, applicable: boolean) => Promise<void>;
+  onApplicabilityChange: (
+    task: ComplianceTaskRecord,
+    applicable: boolean
+  ) => Promise<void>;
 }) {
   const metadata = getTaskMetadata(task);
   const [draft, setDraft] = useState(() => buildDraft(task));
@@ -92,6 +107,7 @@ function FilingCard({
   }, [task]);
 
   const derivedState = getDerivedTaskState(task);
+
   const progress = getChecklistProgress({
     ...task,
     metadata: {
@@ -99,6 +115,7 @@ function FilingCard({
       checklist: draft.checklist,
     },
   });
+
   const dirty = JSON.stringify(draft) !== JSON.stringify(buildDraft(task));
 
   function updateChecklist(itemId: string) {
@@ -127,7 +144,8 @@ function FilingCard({
                 : null,
               filedMethod: draft.filedMethod || null,
               acknowledgementStatus: draft.acknowledgementStatus || null,
-              acknowledgementReference: draft.acknowledgementReference.trim() || null,
+              acknowledgementReference:
+                draft.acknowledgementReference.trim() || null,
               notes: draft.notes.trim() || null,
             },
           } satisfies ComplianceTaskMetadata,
@@ -148,7 +166,7 @@ function FilingCard({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="capitalize">
-              {CATEGORY_LABELS[task.category ?? "other"] ?? task.category ?? "Other"}
+              {getCategoryLabel(task.category)}
             </Badge>
             <Badge
               variant={derivedState === "overdue" ? "destructive" : "secondary"}
@@ -165,7 +183,9 @@ function FilingCard({
           <div>
             <h3 className="text-lg font-semibold">{task.title}</h3>
             {task.description ? (
-              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{task.description}</p>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                {task.description}
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -183,7 +203,8 @@ function FilingCard({
               Does this apply?
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {metadata.optionalPrompt ?? "Confirm whether this filing applies to your LLC."}
+              {metadata.optionalPrompt ??
+                "Confirm whether this filing applies to your LLC."}
             </p>
             <div className="mt-4 flex gap-2">
               <Button
@@ -231,7 +252,8 @@ function FilingCard({
               ))
             ) : (
               <p className="text-sm text-muted-foreground">
-                No checklist items yet. You can still record filing details below.
+                No checklist items yet. You can still record filing details
+                below.
               </p>
             )}
           </div>
@@ -270,7 +292,10 @@ function FilingCard({
                   type="date"
                   value={draft.filedAt}
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, filedAt: event.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      filedAt: event.target.value,
+                    }))
                   }
                 />
               </label>
@@ -282,7 +307,10 @@ function FilingCard({
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
-                      filedMethod: event.target.value as FilingDraft["filedMethod"],
+                      // SAFETY: this <select> only offers the filedMethod
+                      // literals declared in its <option> list.
+                      filedMethod: event.target
+                        .value as FilingDraft["filedMethod"],
                     }))
                   }
                   className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
@@ -307,8 +335,11 @@ function FilingCard({
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
-                      acknowledgementStatus:
-                        event.target.value as FilingDraft["acknowledgementStatus"],
+                      // SAFETY: this <select> only offers the
+                      // acknowledgementStatus literals declared in its
+                      // <option> list.
+                      acknowledgementStatus: event.target
+                        .value as FilingDraft["acknowledgementStatus"],
                     }))
                   }
                   className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
@@ -316,7 +347,9 @@ function FilingCard({
                   <option value="">Not set</option>
                   <option value="received">Received</option>
                   <option value="pending">Pending</option>
-                  <option value="not_available">No acknowledgement available</option>
+                  <option value="not_available">
+                    No acknowledgement available
+                  </option>
                 </select>
               </label>
 
@@ -342,7 +375,10 @@ function FilingCard({
               <Textarea
                 value={draft.notes}
                 onChange={(event) =>
-                  setDraft((current) => ({ ...current, notes: event.target.value }))
+                  setDraft((current) => ({
+                    ...current,
+                    notes: event.target.value,
+                  }))
                 }
                 placeholder="Anything worth remembering about the filing or follow-up."
                 rows={3}
@@ -357,11 +393,19 @@ function FilingCard({
               disabled={!dirty || isSaving || isPending}
               className="btn-warm border-0"
             >
-              {isSaving || isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSaving || isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
               Save filing details
             </Button>
-            {dirty ? <span className="text-xs text-muted-foreground">Unsaved changes</span> : null}
-            {error ? <span className="text-sm text-destructive">{error}</span> : null}
+            {dirty ? (
+              <span className="text-xs text-muted-foreground">
+                Unsaved changes
+              </span>
+            ) : null}
+            {error ? (
+              <span className="text-sm text-destructive">{error}</span>
+            ) : null}
           </div>
         </section>
       </div>
@@ -385,7 +429,9 @@ export function LlcFilingsTracker({
 
   const hiddenOptionalCount = useMemo(
     () =>
-      tasks.filter((task) => getTaskMetadata(task).optional && !isTaskVisible(task)).length,
+      tasks.filter(
+        (task) => getTaskMetadata(task).optional && !isTaskVisible(task)
+      ).length,
     [tasks]
   );
 
@@ -398,11 +444,14 @@ export function LlcFilingsTracker({
   );
 
   const openTasks = useMemo(
-    () => visibleTasks.filter((task) => getDerivedTaskState(task) !== "completed"),
+    () =>
+      visibleTasks.filter((task) => getDerivedTaskState(task) !== "completed"),
     [visibleTasks]
   );
+
   const completedTasks = useMemo(
-    () => visibleTasks.filter((task) => getDerivedTaskState(task) === "completed"),
+    () =>
+      visibleTasks.filter((task) => getDerivedTaskState(task) === "completed"),
     [visibleTasks]
   );
 
@@ -428,12 +477,19 @@ export function LlcFilingsTracker({
       throw new Error("Failed to update filing");
     }
 
+    // SAFETY: the tasks PATCH route returns the updated ComplianceTaskRecord
+    // it just wrote.
     const updated = (await response.json()) as ComplianceTaskRecord;
-    setTasks((current) => current.map((task) => (task.id === updated.id ? updated : task)));
+    setTasks((current) =>
+      current.map((task) => (task.id === updated.id ? updated : task))
+    );
     setSavingTaskId(null);
   }
 
-  async function handleApplicabilityChange(task: ComplianceTaskRecord, applicable: boolean) {
+  async function handleApplicabilityChange(
+    task: ComplianceTaskRecord,
+    applicable: boolean
+  ) {
     const metadata = getTaskMetadata(task);
     await persistTask(task.id, {
       status: task.status ?? "upcoming",
@@ -478,8 +534,8 @@ export function LlcFilingsTracker({
           </p>
           <h1 className="heading-serif mt-2 text-3xl">Filings for {llcName}</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Every filing now has a checklist, a filed date, a method, and a place to note the
-            acknowledgement you received.
+            Every filing now has a checklist, a filed date, a method, and a
+            place to note the acknowledgement you received.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -489,8 +545,14 @@ export function LlcFilingsTracker({
               variant="outline"
               onClick={() => setShowHiddenOptional((current) => !current)}
             >
-              {showHiddenOptional ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              {showHiddenOptional ? "Hide skipped optional filings" : `Show skipped optional filings (${hiddenOptionalCount})`}
+              {showHiddenOptional ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+              {showHiddenOptional
+                ? "Hide skipped optional filings"
+                : `Show skipped optional filings (${hiddenOptionalCount})`}
             </Button>
           ) : null}
         </div>
@@ -523,10 +585,16 @@ export function LlcFilingsTracker({
         </TabsList>
 
         <TabsContent value="open" className="space-y-4">
-          {renderTaskList(openTasks, "Nothing is currently waiting for action.")}
+          {renderTaskList(
+            openTasks,
+            "Nothing is currently waiting for action."
+          )}
         </TabsContent>
         <TabsContent value="filed" className="space-y-4">
-          {renderTaskList(completedTasks, "Filed items will appear here once you record them.")}
+          {renderTaskList(
+            completedTasks,
+            "Filed items will appear here once you record them."
+          )}
         </TabsContent>
         <TabsContent value="all" className="space-y-4">
           {renderTaskList(visibleTasks, "No filings are visible right now.")}
@@ -534,9 +602,9 @@ export function LlcFilingsTracker({
       </Tabs>
 
       <div className="rounded-3xl border border-border bg-secondary/50 px-5 py-4 text-sm text-muted-foreground">
-        Saying <span className="font-medium text-foreground">No, hide it</span> on an optional
-        filing removes it from the main views. You can still reveal skipped optional filings later
-        with the button above.
+        Saying <span className="font-medium text-foreground">No, hide it</span>{" "}
+        on an optional filing removes it from the main views. You can still
+        reveal skipped optional filings later with the button above.
       </div>
     </div>
   );

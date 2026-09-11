@@ -24,11 +24,13 @@ export async function POST(request: NextRequest) {
     if (!isTaskVisible({ ...task, metadata: null })) continue;
 
     const taskDate = new Date(`${task.dueDate}T00:00:00.000Z`);
+
     if (taskDate > dueWindow) continue;
 
     const llc = await db.query.llcs.findFirst({
       where: eq(llcs.id, task.llcId),
     });
+
     if (!llc) continue;
 
     const existing = taskIdsByUser.get(llc.userId) ?? [];
@@ -37,6 +39,7 @@ export async function POST(request: NextRequest) {
   }
 
   const scheduled = [];
+
   for (const [userId, taskIds] of taskIdsByUser.entries()) {
     scheduled.push(...(await scheduleTaskReminders(taskIds, userId)));
   }

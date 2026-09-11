@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
@@ -16,12 +17,10 @@ export async function GET(
 
   // Verify LLC ownership
   const llc = await requireApiLlcAccess(session.user.id, id);
+
   if ("response" in llc) return llc.response;
 
-  const docs = await db
-    .select()
-    .from(documents)
-    .where(eq(documents.llcId, id));
+  const docs = await db.select().from(documents).where(eq(documents.llcId, id));
 
   return NextResponse.json(docs);
 }

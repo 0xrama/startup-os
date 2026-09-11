@@ -10,9 +10,11 @@ export async function POST(
 ) {
   try {
     const context = await requireApiContext();
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id } = await params;
+
     const notice = await db.query.noticeCases.findFirst({
       where: eq(noticeCases.id, id),
     });
@@ -24,6 +26,7 @@ export async function POST(
     const access = await requireApiLlcAccess(session.user.id, notice.llcId, {
       editable: true,
     });
+
     if ("response" in access) return access.response;
 
     const [updated] = await db
@@ -38,7 +41,10 @@ export async function POST(
     return NextResponse.json(updated);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to dismiss notice" },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to dismiss notice",
+      },
       { status: 500 }
     );
   }

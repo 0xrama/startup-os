@@ -2,13 +2,14 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "./auth";
 import { db } from "./db";
 import { llcCollaborators, llcs } from "./schema";
+import type { CollaboratorRole } from "./schema";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getUserSubscription, hasActiveSubscription } from "./subscription";
 import type { Plan } from "./plan-limits";
 import { isAdminEmail } from "./admin";
 
-export type LlcRole = "owner" | "editor" | "viewer";
+export type LlcRole = CollaboratorRole;
 
 export async function requireSession() {
   const session = await auth.api.getSession({
@@ -43,7 +44,7 @@ export async function requireSubscribedSession(): Promise<{
     subscription: isAdmin
       ? { status: "active", plan: "pro" }
       : (subscription ?? null),
-    plan: isAdmin ? "pro" : ((subscription?.plan as Plan) ?? null),
+    plan: isAdmin ? "pro" : (subscription?.plan ?? null),
   };
 }
 
@@ -70,10 +71,8 @@ export async function requirePageSubscription() {
 
   return {
     session,
-    subscription: isAdmin
-      ? { status: "active", plan: "pro" }
-      : subscription,
-    plan: isAdmin ? "pro" : ((subscription?.plan as Plan) ?? null),
+    subscription: isAdmin ? { status: "active", plan: "pro" } : subscription,
+    plan: isAdmin ? "pro" : (subscription?.plan ?? null),
   };
 }
 
@@ -119,7 +118,7 @@ export async function getLlcAccess(userId: string, llcId: string) {
 
   return {
     llc,
-    role: collaborator.role as LlcRole,
+    role: collaborator.role,
     collaborator,
   };
 }

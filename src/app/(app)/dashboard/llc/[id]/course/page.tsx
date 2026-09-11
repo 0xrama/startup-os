@@ -178,6 +178,7 @@ const COURSE: Lesson[] = [
 
 export default function CoursePage() {
   const [activeLesson, setActiveLesson] = useState<string>(COURSE[0].id);
+
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(
     new Set()
   );
@@ -188,6 +189,7 @@ export default function CoursePage() {
   function markComplete(lessonId: string) {
     setCompletedLessons((prev) => new Set([...prev, lessonId]));
     const currentIdx = COURSE.findIndex((l) => l.id === lessonId);
+
     if (currentIdx < COURSE.length - 1) {
       setActiveLesson(COURSE[currentIdx + 1].id);
     }
@@ -198,7 +200,8 @@ export default function CoursePage() {
       <div className="mb-10">
         <h1 className="heading-serif text-3xl mb-1">Onboarding Course</h1>
         <p className="text-sm text-muted-foreground">
-          Learn the core compliance obligations for your simple entity step by step.
+          Learn the core compliance obligations for your simple entity step by
+          step.
         </p>
         {/* Progress bar */}
         <div className="mt-4 flex items-center gap-3">
@@ -220,6 +223,7 @@ export default function CoursePage() {
           {COURSE.map((lesson) => {
             const isActive = lesson.id === activeLesson;
             const isComplete = completedLessons.has(lesson.id);
+
             return (
               <button
                 key={lesson.id}
@@ -263,7 +267,10 @@ export default function CoursePage() {
           </div>
 
           {currentLesson.content.map((section, i) => (
-            <div key={i} className="card-warm p-6 transition-all hover:shadow-sm">
+            <div
+              key={i}
+              className="card-warm p-6 transition-all hover:shadow-sm"
+            >
               <h3 className="heading-serif text-lg mb-3">{section.heading}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                 {section.body}

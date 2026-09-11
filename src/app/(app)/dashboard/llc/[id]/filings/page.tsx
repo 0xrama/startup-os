@@ -20,24 +20,31 @@ export default async function FilingsPage({
     .where(eq(complianceTasks.llcId, id));
 
   // Group by category
-  const categories = tasks.reduce(
-    (acc, task) => {
-      const cat = task.category || "other";
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(task);
-      return acc;
-    },
-    {} as Record<string, typeof tasks>
-  );
+  const categories = tasks.reduce<Record<string, typeof tasks>>((acc, task) => {
+    const cat = task.category || "other";
 
-  const categoryLabels: Record<string, string> = {
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(task);
+
+    return acc;
+  }, {});
+
+  const categoryLabels = {
     federal_tax: "Federal Tax Filings",
     state_tax: "State Tax Filings",
     annual_report: "Annual Reports",
     ra_renewal: "Registered Agent Renewals",
     boi_report: "BOI Reports",
     other: "Other",
-  };
+  } satisfies Record<string, string>;
+
+  function getCategoryLabel(category: string) {
+    const entry = Object.entries(categoryLabels).find(
+      ([key]) => key === category
+    );
+
+    return entry?.[1] ?? category;
+  }
 
   return (
     <div>
@@ -64,7 +71,7 @@ export default async function FilingsPage({
           {Object.entries(categories).map(([cat, catTasks]) => (
             <div key={cat}>
               <h2 className="heading-serif text-lg mb-3">
-                {categoryLabels[cat] || cat}
+                {getCategoryLabel(cat)}
               </h2>
               <div className="space-y-2">
                 {catTasks.map((task) => (
@@ -93,8 +100,8 @@ export default async function FilingsPage({
                           task.status === "completed"
                             ? "secondary"
                             : task.status === "overdue"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                         className="text-xs"
                       >

@@ -2,6 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 const MAX_FILE_SIZE_BYTES = 1024 * 1024;
+
 const IGNORED_DIRECTORIES = new Set([
   ".git",
   ".next",
@@ -12,6 +13,7 @@ const IGNORED_DIRECTORIES = new Set([
   "docs/reference",
   "node_modules",
 ]);
+
 const ALLOWED_LARGE_FILES = new Set([
   "package-lock.json",
   "pnpm-lock.yaml",
@@ -30,6 +32,7 @@ async function* walk(directory) {
       ) {
         continue;
       }
+
       yield* walk(absolutePath);
       continue;
     }
@@ -46,6 +49,7 @@ for await (const file of walk(process.cwd())) {
   }
 
   const fileStat = await stat(file.absolutePath);
+
   if (fileStat.size > MAX_FILE_SIZE_BYTES) {
     oversizedFiles.push({
       path: file.relativePath,
@@ -56,8 +60,10 @@ for await (const file of walk(process.cwd())) {
 
 if (oversizedFiles.length > 0) {
   console.error("Oversized files detected:");
+
   for (const file of oversizedFiles) {
     console.error(`- ${file.path}: ${Math.round(file.size / 1024)}KB`);
   }
+
   process.exit(1);
 }

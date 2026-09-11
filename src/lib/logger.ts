@@ -1,14 +1,19 @@
-type JsonValue =
-  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+import type { JsonValue } from "./json";
 
-type LogContext = Record<string, unknown>;
+/** Values a logger context entry may hold before redaction. */
+type LogValue = JsonValue | Error;
+
+/** Structured log context passed to the scoped loggers. */
+type LogContext = { [key: string]: LogValue };
+
 type LogLevel = "info" | "warn" | "error";
 
 const REDACTED = "[REDACTED]";
+
 const SENSITIVE_KEY_PATTERN =
   /(secret|token|password|authorization|cookie|key|pin|ciphertext|access)/i;
 
-function serializeError(error: Error) {
+function serializeError(error: Error): JsonValue {
   return {
     name: error.name,
     message: error.message,
@@ -16,36 +21,42 @@ function serializeError(error: Error) {
   };
 }
 
-export function redactLogData(value: unknown): JsonValue {
+/** Narrow to the plain-object branch of {@link LogValue}; primitives and arrays stay out. */
+function isPlainRecord(value: LogValue): value is { [key: string]: JsonValue } {
+  if (value === null || Array.isArray(value) || value instanceof Error) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+
+  return prototype === Object.prototype || prototype === null;
+}
+
+function redactLogValue(value: LogValue): JsonValue {
   if (value instanceof Error) {
     return serializeError(value);
   }
 
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return value;
-  }
-
   if (Array.isArray(value)) {
-    return value.map((entry) => redactLogData(entry));
+    return value.map((entry) => redactLogValue(entry));
   }
 
-  if (typeof value === "object") {
-    const entries = Object.entries(value as LogContext).map(
-      ([key, nestedValue]) => [
-        key,
-        SENSITIVE_KEY_PATTERN.test(key) ? REDACTED : redactLogData(nestedValue),
-      ]
-    );
-
-    return Object.fromEntries(entries) as JsonValue;
+  if (isPlainRecord(value)) {
+    return redactLogData(value);
   }
 
-  return String(value);
+  return value;
+}
+
+export function redactLogData(context: LogContext): {
+  [key: string]: JsonValue;
+} {
+  return Object.fromEntries(
+    Object.entries(context).map(([key, nestedValue]) => [
+      key,
+      SENSITIVE_KEY_PATTERN.test(key) ? REDACTED : redactLogValue(nestedValue),
+    ])
+  );
 }
 
 function writeStructuredLog(
@@ -53,7 +64,7 @@ function writeStructuredLog(
   message: string,
   context: LogContext
 ) {
-  const consoleApi = globalThis.console as Console;
+  const consoleApi = globalThis.console;
   const writer = consoleApi[level] ?? consoleApi.info;
   writer.call(
     consoleApi,

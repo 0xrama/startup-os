@@ -32,6 +32,7 @@ export default async function LLCOverviewPage({
     .where(eq(complianceTasks.llcId, id));
 
   const docs = await db.select().from(documents).where(eq(documents.llcId, id));
+
   const collaborators = await db.query.llcCollaborators.findMany({
     where: eq(llcCollaborators.llcId, id),
   });
@@ -167,16 +168,7 @@ export default async function LLCOverviewPage({
               encryptedData={llc.encryptedData}
               fallbackEin={llc.ein}
               fallbackRegisteredAgent={llc.registeredAgent}
-              fallbackMembers={
-                (llc.members as
-                  | {
-                      name: string;
-                      ownershipPct: number;
-                      country: string;
-                      taxIdType: string;
-                    }[]
-                  | null) ?? null
-              }
+              fallbackMembers={llc.members}
             />
           </div>
 

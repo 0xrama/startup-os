@@ -10,6 +10,7 @@ export async function GET(
 ) {
   try {
     const context = await requireApiContext();
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id } = await params;
@@ -23,12 +24,15 @@ export async function GET(
     }
 
     const access = await requireApiLlcAccess(session.user.id, notice.llcId);
+
     if ("response" in access) return access.response;
 
     return NextResponse.json(notice);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to load notice" },
+      {
+        error: error instanceof Error ? error.message : "Unable to load notice",
+      },
       { status: 500 }
     );
   }

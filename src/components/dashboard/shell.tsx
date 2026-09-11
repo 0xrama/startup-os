@@ -125,6 +125,7 @@ function DashboardNavContent({
             </div>
             {llcNavItems.map((item) => {
               const href = `/dashboard/llc/${llcId}${item.segment}`;
+
               return (
                 <NavItem
                   key={href}
@@ -183,6 +184,7 @@ export function DashboardShell({
 
   const llcMatch = pathname.match(/\/dashboard\/llc\/([^/]+)/);
   const llcId = llcMatch?.[1];
+
   const handleSignOut = () => {
     lock();
     signOut({

@@ -10,6 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
@@ -17,6 +18,7 @@ export async function GET(
 
   // Verify LLC ownership
   const llc = await requireApiLlcAccess(session.user.id, id);
+
   if ("response" in llc) return llc.response;
 
   const tasks = await db
@@ -32,13 +34,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
   const { id } = await params;
   const body = await request.json();
 
-  const llc = await requireApiLlcAccess(session.user.id, id, { editable: true });
+  const llc = await requireApiLlcAccess(session.user.id, id, {
+    editable: true,
+  });
+
   if ("response" in llc) return llc.response;
 
   const [task] = await db

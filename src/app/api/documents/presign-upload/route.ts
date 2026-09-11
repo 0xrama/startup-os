@@ -20,10 +20,12 @@ const MAX_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(request: NextRequest) {
   const context = await requireApiContext({ feature: "documents" });
+
   if ("response" in context) return context.response;
   const { session } = context;
 
   const body = await request.json();
+
   const {
     llcId,
     fileName,
@@ -45,10 +47,14 @@ export async function POST(request: NextRequest) {
   const llcAccess = await requireApiLlcAccess(session.user.id, llcId, {
     editable: true,
   });
+
   if ("response" in llcAccess) return llcAccess.response;
 
   if (!ALLOWED_TYPES.includes(fileType)) {
-    return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+    return NextResponse.json(
+      { error: "File type not allowed" },
+      { status: 400 }
+    );
   }
 
   if (fileSize > MAX_SIZE) {
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
   const encryption = await db.query.userEncryption.findFirst({
     where: eq(userEncryption.userId, session.user.id),
   });
+
   const hasEncryption = !!encryption;
 
   if (hasEncryption && (!encryptedMetadata || !wrappedFileKey || !fileIv)) {
@@ -99,7 +106,14 @@ export async function POST(request: NextRequest) {
     action: "document.upload",
     resourceType: "document",
     resourceId: doc.id,
-    metadata: { fileName, fileType, fileSize, category, llcId, encrypted: hasEncryption },
+    metadata: {
+      fileName,
+      fileType,
+      fileSize,
+      category,
+      llcId,
+      encrypted: hasEncryption,
+    },
   });
 
   return NextResponse.json({

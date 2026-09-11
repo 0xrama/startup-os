@@ -2,3 +2,5 @@ coverage
 docs/reference
 node_modules
 .next
+tools/oxlint/anti-slop
+.agents

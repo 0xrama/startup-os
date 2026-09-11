@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 
 const inputs = process.argv.slice(2);
+
 const ignoredDirectories = new Set(["docs/reference"]);
 
 if (inputs.length === 0) {
@@ -16,6 +17,7 @@ async function* walk(targetPath) {
 
   if (stats.isFile()) {
     yield absolutePath;
+
     return;
   }
 
@@ -54,8 +56,10 @@ for (const input of inputs) {
 
 if (matches.length > 0) {
   console.error("Technical debt markers found:");
+
   for (const match of matches) {
     console.error(`- ${match}`);
   }
+
   process.exit(1);
 }

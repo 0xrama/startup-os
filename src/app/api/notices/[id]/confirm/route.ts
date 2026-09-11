@@ -11,10 +11,12 @@ export async function POST(
 ) {
   try {
     const context = await requireApiContext({ feature: "notice-triage" });
+
     if ("response" in context) return context.response;
     const { session } = context;
 
     const { id } = await params;
+
     const notice = await db.query.noticeCases.findFirst({
       where: eq(noticeCases.id, id),
     });
@@ -26,9 +28,11 @@ export async function POST(
     const access = await requireApiLlcAccess(session.user.id, notice.llcId, {
       editable: true,
     });
+
     if ("response" in access) return access.response;
 
     const payload = notice.draftTaskPayload;
+
     if (!payload?.title || !payload.dueDate) {
       return NextResponse.json(
         { error: "Notice draft is incomplete" },
@@ -63,7 +67,10 @@ export async function POST(
     return NextResponse.json({ notice: updated, task });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to confirm notice" },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to confirm notice",
+      },
       { status: 500 }
     );
   }

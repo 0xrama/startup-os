@@ -9,6 +9,7 @@ function SourceIcon({ type }: { type: string }) {
   if (type === "irs" || type === "state") {
     return <BookOpen className="h-3 w-3" />;
   }
+
   return <FileText className="h-3 w-3" />;
 }
 

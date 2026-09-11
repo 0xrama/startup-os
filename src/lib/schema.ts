@@ -1,6 +1,17 @@
 import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
 
+import type { JsonValue } from "./json";
+
 const nextId = () => crypto.randomUUID();
+
+/** Roles a collaborator can hold on an LLC. */
+export type CollaboratorRole = "owner" | "editor" | "viewer";
+
+/** Roles stored for chat messages. */
+export type ChatRole = "user" | "assistant";
+
+/** JSON object contract for audit log metadata. */
+export type AuditMetadata = { [key: string]: JsonValue };
 
 // ─── Better Auth tables ──────────────────────────────────────────
 // Better Auth auto-creates: user, session, account, verification
@@ -295,7 +306,7 @@ export const chatMessages = sqliteTable("chat_messages", {
   conversationId: text("conversation_id")
     .notNull()
     .references(() => chatConversations.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
+  role: text("role").$type<ChatRole>().notNull(),
   requestId: text("request_id"),
   model: text("model"),
   finishReason: text("finish_reason"),
@@ -350,7 +361,7 @@ export const subscriptions = sqliteTable("subscriptions", {
   userId: text("user_id").notNull().unique(),
   polarCustomerId: text("polar_customer_id"),
   polarSubscriptionId: text("polar_subscription_id"),
-  plan: text("plan"),
+  plan: text("plan").$type<"starter" | "pro">(),
   status: text("status").default("expired"),
   currentPeriodStart: integer("current_period_start", {
     mode: "timestamp",
@@ -369,7 +380,7 @@ export const llcCollaborators = sqliteTable("llc_collaborators", {
     .references(() => llcs.id, { onDelete: "cascade" }),
   email: text("email").notNull(),
   userId: text("user_id"),
-  role: text("role").notNull().default("viewer"),
+  role: text("role").$type<CollaboratorRole>().notNull().default("viewer"),
   status: text("status").notNull().default("pending"),
   invitedBy: text("invited_by").notNull(),
   acceptedAt: integer("accepted_at", { mode: "timestamp" }),
@@ -395,10 +406,9 @@ export const noticeCases = sqliteTable("notice_cases", {
   responseDueDate: text("response_due_date"),
   summary: text("summary"),
   riskLevel: text("risk_level"),
-  structuredData: text("structured_data", { mode: "json" }).$type<Record<
-    string,
-    unknown
-  > | null>(),
+  structuredData: text("structured_data", {
+    mode: "json",
+  }).$type<JsonValue | null>(),
   draftTaskPayload: text("draft_task_payload", { mode: "json" }).$type<{
     title?: string;
     description?: string;
@@ -421,7 +431,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   action: text("action").notNull(),
   resourceType: text("resource_type"),
   resourceId: text("resource_id"),
-  metadata: text("metadata", { mode: "json" }),
+  metadata: text("metadata", { mode: "json" }).$type<AuditMetadata | null>(),
   ipAddress: text("ip_address"),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
 });

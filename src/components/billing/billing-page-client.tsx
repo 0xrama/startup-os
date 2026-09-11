@@ -57,6 +57,7 @@ export function BillingPageClient({
 }) {
   const [loading, setLoading] = useState<string | null>(null);
   const active = currentStatus === "active" && Boolean(currentPlan);
+
   const headerCopy = useMemo(() => {
     if (isAdmin) {
       return {
@@ -87,6 +88,7 @@ export function BillingPageClient({
 
   async function handleCheckout(plan: string) {
     setLoading(plan);
+
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -112,7 +114,9 @@ export function BillingPageClient({
           <h1 className="heading-serif text-3xl mb-1">{headerCopy.title}</h1>
           <p className="text-sm text-muted-foreground">{headerCopy.body}</p>
         </div>
-        {active ? <Badge variant="secondary">{currentPlan} active</Badge> : null}
+        {active ? (
+          <Badge variant="secondary">{currentPlan} active</Badge>
+        ) : null}
       </div>
 
       <VaultSetupCard />
@@ -126,13 +130,19 @@ export function BillingPageClient({
               </>
             ) : (
               <>
-                Billing is active on the <span className="font-medium text-foreground">{currentPlan}</span> plan.
+                Billing is active on the{" "}
+                <span className="font-medium text-foreground">
+                  {currentPlan}
+                </span>{" "}
+                plan.
               </>
             )}
           </p>
           <div className="flex flex-wrap gap-3">
             <Link href="/onboarding">
-              <Button className="btn-warm border-0">Continue to company setup</Button>
+              <Button className="btn-warm border-0">
+                Continue to company setup
+              </Button>
             </Link>
             <Link href="/dashboard">
               <Button variant="secondary">Open dashboard</Button>
@@ -143,11 +153,14 @@ export function BillingPageClient({
         <div className="grid md:grid-cols-2 gap-6 max-w-3xl">
           {plans.map((plan) => {
             const highlighted = suggestedPlan === plan.id;
+
             return (
               <div
                 key={plan.id}
                 className={`card-warm p-8 flex flex-col justify-between relative ${
-                  plan.popular || highlighted ? "border-2 border-primary/20" : ""
+                  plan.popular || highlighted
+                    ? "border-2 border-primary/20"
+                    : ""
                 }`}
               >
                 {plan.popular ? (
@@ -156,15 +169,21 @@ export function BillingPageClient({
                   </div>
                 ) : null}
                 <div>
-                  <h3 className="font-semibold text-lg mb-1 tracking-tight">{plan.name}</h3>
+                  <h3 className="font-semibold text-lg mb-1 tracking-tight">
+                    {plan.name}
+                  </h3>
                   <div className="mt-4 mb-8">
                     <span className="heading-serif text-4xl">{plan.price}</span>
-                    <span className="text-muted-foreground text-sm">{plan.period}</span>
+                    <span className="text-muted-foreground text-sm">
+                      {plan.period}
+                    </span>
                   </div>
                   <ul className="space-y-2.5 mb-8">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2.5 text-sm">
-                        <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${plan.popular ? "text-primary" : "text-[#2D6A4F]"}`} />
+                        <CheckCircle2
+                          className={`h-4 w-4 flex-shrink-0 ${plan.popular ? "text-primary" : "text-[#2D6A4F]"}`}
+                        />
                         {f}
                       </li>
                     ))}

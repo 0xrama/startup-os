@@ -61,10 +61,26 @@ const ENTITY_TYPES = [
 ];
 
 const TAX_CLASSIFICATIONS = [
-  { value: "disregarded", label: "Disregarded Entity", desc: "Default for single-member" },
-  { value: "partnership", label: "Partnership", desc: "Default for multi-member" },
-  { value: "s-corp", label: "S-Corporation", desc: "Basic domestic election via Form 2553" },
-  { value: "c-corp", label: "C-Corporation", desc: "Basic domestic corporation return" },
+  {
+    value: "disregarded",
+    label: "Disregarded Entity",
+    desc: "Default for single-member",
+  },
+  {
+    value: "partnership",
+    label: "Partnership",
+    desc: "Default for multi-member",
+  },
+  {
+    value: "s-corp",
+    label: "S-Corporation",
+    desc: "Basic domestic election via Form 2553",
+  },
+  {
+    value: "c-corp",
+    label: "C-Corporation",
+    desc: "Basic domestic corporation return",
+  },
 ];
 
 const OWNER_RESIDENCY_OPTIONS = [
@@ -127,9 +143,11 @@ export default function OnboardingPage() {
   const [taxYearEnd, setTaxYearEnd] = useState("12-31");
   const [registeredAgent, setRegisteredAgent] = useState("");
   const [raRenewalDate, setRaRenewalDate] = useState("");
+
   const [members, setMembers] = useState<MemberEntry[]>([
     { name: "", ownershipPct: 100, country: "", taxIdType: "foreign" },
   ]);
+
   const [remindDaysBefore, setRemindDaysBefore] = useState(30);
   const [channels, setChannels] = useState<string[]>(["email"]);
 
@@ -145,6 +163,7 @@ export default function OnboardingPage() {
 
         if (!response.ok) {
           router.replace("/dashboard/settings/billing");
+
           return;
         }
 
@@ -152,6 +171,7 @@ export default function OnboardingPage() {
 
         if (!data.active) {
           router.replace("/dashboard/settings/billing");
+
           return;
         }
 
@@ -191,7 +211,10 @@ export default function OnboardingPage() {
   }, [entityType]);
 
   useEffect(() => {
-    const allowed = getTaxClassificationOptions(entityType).map((option) => option.value);
+    const allowed = getTaxClassificationOptions(entityType).map(
+      (option) => option.value
+    );
+
     if (!entityType || allowed.includes(taxClassification)) return;
 
     if (entityType === "corporation") {
@@ -206,7 +229,9 @@ export default function OnboardingPage() {
   if (!subscriptionChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Checking your subscription…</p>
+        <p className="text-sm text-muted-foreground">
+          Checking your subscription…
+        </p>
       </div>
     );
   }
@@ -237,9 +262,9 @@ export default function OnboardingPage() {
     ]);
   }
 
-  function updateMember(index: number, field: keyof MemberEntry, value: string | number) {
+  function updateMember(index: number, patch: Partial<MemberEntry>) {
     const updated = [...members];
-    (updated[index] as Record<string, string | number>)[field] = value;
+    updated[index] = { ...updated[index], ...patch };
     setMembers(updated);
   }
 
@@ -252,6 +277,7 @@ export default function OnboardingPage() {
   async function handleSubmit() {
     if (configured && !masterKey) {
       setError("Unlock your vault to continue.");
+
       return;
     }
 
@@ -327,22 +353,28 @@ export default function OnboardingPage() {
                     i < step
                       ? "bg-primary text-white shadow-sm"
                       : i === step
-                      ? "bg-primary text-white shadow-md shadow-primary/20"
-                      : "bg-secondary text-muted-foreground"
+                        ? "bg-primary text-white shadow-md shadow-primary/20"
+                        : "bg-secondary text-muted-foreground"
                   }`}
                 >
                   {i < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
-                <span className={`text-xs mt-1.5 transition-colors duration-300 ${
-                  i <= step ? "text-foreground font-medium" : "text-muted-foreground"
-                }`}>
+                <span
+                  className={`text-xs mt-1.5 transition-colors duration-300 ${
+                    i <= step
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground"
+                  }`}
+                >
                   {s.label}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`hidden sm:block w-12 lg:w-16 h-0.5 mx-1.5 mt-[-18px] rounded-full transition-colors duration-500 ${
-                  i < step ? "bg-primary" : "bg-border"
-                }`} />
+                <div
+                  className={`hidden sm:block w-12 lg:w-16 h-0.5 mx-1.5 mt-[-18px] rounded-full transition-colors duration-500 ${
+                    i < step ? "bg-primary" : "bg-border"
+                  }`}
+                />
               )}
             </div>
           ))}
@@ -353,9 +385,12 @@ export default function OnboardingPage() {
           {step === 0 && (
             <>
               <div className="mb-6">
-                <h2 className="heading-serif text-2xl mb-1">What&apos;s your entity called?</h2>
+                <h2 className="heading-serif text-2xl mb-1">
+                  What&apos;s your entity called?
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Pax currently supports straightforward LLCs and basic corporations.
+                  Pax currently supports straightforward LLCs and basic
+                  corporations.
                 </p>
               </div>
               <div className="space-y-6">
@@ -414,8 +449,10 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-secondary/40 p-4 text-xs leading-relaxed text-muted-foreground">
-                  Pax is built for straightforward operating companies. If you are raising venture capital,
-                  managing a complex cap table, or need full tax operations, the flagship product will be a better fit once it launches.
+                  Pax is built for straightforward operating companies. If you
+                  are raising venture capital, managing a complex cap table, or
+                  need full tax operations, the flagship product will be a
+                  better fit once it launches.
                 </div>
               </div>
             </>
@@ -425,9 +462,12 @@ export default function OnboardingPage() {
           {step === 1 && (
             <>
               <div className="mb-6">
-                <h2 className="heading-serif text-2xl mb-1">Where is it formed?</h2>
+                <h2 className="heading-serif text-2xl mb-1">
+                  Where is it formed?
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Select the formation state and add your EIN details if available.
+                  Select the formation state and add your EIN details if
+                  available.
                 </p>
               </div>
               <div className="space-y-6">
@@ -507,7 +547,9 @@ export default function OnboardingPage() {
                 </div>
                 {registeredAgent && (
                   <div className="space-y-2">
-                    <Label htmlFor="ra-renewal">RA renewal date (optional)</Label>
+                    <Label htmlFor="ra-renewal">
+                      RA renewal date (optional)
+                    </Label>
                     <Input
                       id="ra-renewal"
                       type="date"
@@ -525,7 +567,9 @@ export default function OnboardingPage() {
           {step === 2 && (
             <>
               <div className="mb-6">
-                <h2 className="heading-serif text-2xl mb-1">Tax classification</h2>
+                <h2 className="heading-serif text-2xl mb-1">
+                  Tax classification
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   How is this entity classified for federal tax purposes?
                 </p>
@@ -553,7 +597,8 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    For a basic corporation, choose C-Corporation unless you already made an S-Corp election.
+                    For a basic corporation, choose C-Corporation unless you
+                    already made an S-Corp election.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -590,7 +635,9 @@ export default function OnboardingPage() {
                   >
                     <div className="flex items-center justify-between">
                       <Badge variant="secondary">
-                        {entityType === "corporation" ? `Owner ${i + 1}` : `Member ${i + 1}`}
+                        {entityType === "corporation"
+                          ? `Owner ${i + 1}`
+                          : `Member ${i + 1}`}
                       </Badge>
                       {members.length > 1 && (
                         <Button
@@ -610,7 +657,7 @@ export default function OnboardingPage() {
                           placeholder="Jane Doe"
                           value={member.name}
                           onChange={(e) =>
-                            updateMember(i, "name", e.target.value)
+                            updateMember(i, { name: e.target.value })
                           }
                         />
                       </div>
@@ -622,11 +669,9 @@ export default function OnboardingPage() {
                           max={100}
                           value={member.ownershipPct}
                           onChange={(e) =>
-                            updateMember(
-                              i,
-                              "ownershipPct",
-                              Number(e.target.value)
-                            )
+                            updateMember(i, {
+                              ownershipPct: Number(e.target.value),
+                            })
                           }
                         />
                       </div>
@@ -636,7 +681,7 @@ export default function OnboardingPage() {
                           placeholder="e.g., Germany"
                           value={member.country}
                           onChange={(e) =>
-                            updateMember(i, "country", e.target.value)
+                            updateMember(i, { country: e.target.value })
                           }
                         />
                       </div>
@@ -646,7 +691,7 @@ export default function OnboardingPage() {
                           placeholder="e.g., foreign, ITIN, SSN"
                           value={member.taxIdType}
                           onChange={(e) =>
-                            updateMember(i, "taxIdType", e.target.value)
+                            updateMember(i, { taxIdType: e.target.value })
                           }
                         />
                       </div>
@@ -671,14 +716,18 @@ export default function OnboardingPage() {
           {step === 4 && (
             <>
               <div className="mb-6">
-                <h2 className="heading-serif text-2xl mb-1">Reminder preferences</h2>
+                <h2 className="heading-serif text-2xl mb-1">
+                  Reminder preferences
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   How and when should we remind you about deadlines?
                 </p>
               </div>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="remind-days">Remind me this many days before</Label>
+                  <Label htmlFor="remind-days">
+                    Remind me this many days before
+                  </Label>
                   <Input
                     id="remind-days"
                     type="number"
@@ -703,7 +752,8 @@ export default function OnboardingPage() {
                         type="button"
                         disabled={ch.value === "whatsapp" && !whatsappAvailable}
                         onClick={() => {
-                          if (ch.value === "whatsapp" && !whatsappAvailable) return;
+                          if (ch.value === "whatsapp" && !whatsappAvailable)
+                            return;
                           setChannels((prev) =>
                             prev.includes(ch.value)
                               ? prev.filter((c) => c !== ch.value)
@@ -758,7 +808,11 @@ export default function OnboardingPage() {
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={loading || !canProceed()} className="btn-warm border-0">
+              <Button
+                onClick={handleSubmit}
+                disabled={loading || !canProceed()}
+                className="btn-warm border-0"
+              >
                 {loading ? "Creating…" : "Create entity"}
                 <Check className="h-4 w-4 ml-2" />
               </Button>

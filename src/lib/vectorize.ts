@@ -1,8 +1,16 @@
+import type { KnowledgeChunkMetadata } from "./knowledge";
+
+/** Flat metadata payload stored on each knowledge vector. */
+export type VectorizeKnowledgeMetadata = KnowledgeChunkMetadata & {
+  source: string;
+  content: string;
+};
+
 type VectorizeVector = {
   id: string;
   values: number[];
   namespace?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: VectorizeKnowledgeMetadata;
 };
 
 type VectorizeQueryOptions = {
@@ -14,7 +22,7 @@ type VectorizeQueryOptions = {
 type VectorizeMatch = {
   id: string;
   score: number;
-  metadata?: Record<string, unknown>;
+  metadata?: VectorizeKnowledgeMetadata;
 };
 
 type VectorizeQueryResult = {
@@ -23,8 +31,8 @@ type VectorizeQueryResult = {
 };
 
 type VectorizeIndexBinding = {
-  upsert: (vectors: VectorizeVector[]) => Promise<unknown>;
-  deleteByIds: (ids: string[]) => Promise<unknown>;
+  upsert: (vectors: VectorizeVector[]) => Promise<void>;
+  deleteByIds: (ids: string[]) => Promise<void>;
   query: (
     vector: number[],
     options?: VectorizeQueryOptions
@@ -41,11 +49,14 @@ type VectorizeRuntimeGlobals = {
 export type VectorizeKnowledgeMatch = {
   id: string;
   score: number;
-  metadata: Record<string, unknown>;
+  metadata: VectorizeKnowledgeMetadata;
 };
 
 function getVectorizeBinding() {
+  // SAFETY: globalThis only carries the VECTORIZE binding inside the Workers
+  // runtime; every access below is optional-chained so absence resolves to null.
   const globals = globalThis as VectorizeRuntimeGlobals;
+
   return globals.VECTORIZE ?? globals.env?.VECTORIZE ?? null;
 }
 
@@ -55,21 +66,25 @@ export function isVectorizeEnabled() {
 
 export async function upsertKnowledgeVectors(vectors: VectorizeVector[]) {
   const vectorize = getVectorizeBinding();
+
   if (!vectorize || vectors.length === 0) {
     return false;
   }
 
   await vectorize.upsert(vectors);
+
   return true;
 }
 
 export async function deleteKnowledgeVectors(ids: string[]) {
   const vectorize = getVectorizeBinding();
+
   if (!vectorize || ids.length === 0) {
     return false;
   }
 
   await vectorize.deleteByIds(ids);
+
   return true;
 }
 
@@ -83,6 +98,7 @@ export async function queryKnowledgeVectors({
   limit: number;
 }) {
   const vectorize = getVectorizeBinding();
+
   if (!vectorize || namespaces.length === 0) {
     return null;
   }

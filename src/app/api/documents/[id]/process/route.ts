@@ -10,11 +10,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireApiContext({ feature: "document-intelligence" });
+    const context = await requireApiContext({
+      feature: "document-intelligence",
+    });
+
     if ("response" in context) return context.response;
     const { session } = context;
 
     const { id } = await params;
+
     const document = await db.query.documents.findFirst({
       where: eq(documents.id, id),
     });
@@ -24,9 +28,11 @@ export async function POST(
     }
 
     const access = await requireApiLlcAccess(session.user.id, document.llcId);
+
     if ("response" in access) return access.response;
 
     await processDocumentIntelligence(id);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

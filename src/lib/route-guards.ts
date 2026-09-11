@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { checkFeatureAccess, getUpgradeStatusCode, type FeatureCode } from "./feature-gate";
+import {
+  checkFeatureAccess,
+  getUpgradeStatusCode,
+  type FeatureCode,
+} from "./feature-gate";
 import {
   canEditLlc,
   canManageCollaborators,
@@ -31,6 +35,7 @@ export async function requireApiContext(options?: { feature?: FeatureCode }) {
 
     if (options?.feature) {
       const gate = await checkFeatureAccess(session.user.id, options.feature);
+
       if (!gate.allowed) {
         return {
           response: routeErrorResponse(
@@ -49,7 +54,9 @@ export async function requireApiContext(options?: { feature?: FeatureCode }) {
     }
 
     if (error instanceof Error && error.message === "SUBSCRIPTION_REQUIRED") {
-      return { response: routeErrorResponse("Active subscription required", 402) };
+      return {
+        response: routeErrorResponse("Active subscription required", 402),
+      };
     }
 
     throw error;
@@ -77,4 +84,3 @@ export async function requireApiLlcAccess(
 
   return { access };
 }
-

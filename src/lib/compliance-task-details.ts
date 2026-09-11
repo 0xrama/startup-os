@@ -1,6 +1,7 @@
 import { llcs, complianceTasks } from "./schema";
 
 export type ComplianceTaskRecord = typeof complianceTasks.$inferSelect;
+
 export type LlcRecord = typeof llcs.$inferSelect;
 
 export type TaskChecklistItem = {
@@ -34,11 +35,7 @@ export type ComplianceTaskMetadata = {
 };
 
 export type DerivedTaskState =
-  | "completed"
-  | "overdue"
-  | "due_soon"
-  | "upcoming"
-  | "hidden";
+  "completed" | "overdue" | "due_soon" | "upcoming" | "hidden";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -47,16 +44,20 @@ function mergeChecklist(
   overrides: TaskChecklistItem[] | undefined
 ) {
   if (!defaults?.length) return overrides ?? [];
+
   if (!overrides?.length) return defaults;
 
   const overrideMap = new Map(overrides.map((item) => [item.id, item]));
+
   const merged = defaults.map((item) => ({
     ...item,
     ...overrideMap.get(item.id),
   }));
+
   const extraItems = overrides.filter(
     (item) => !defaults.some((base) => base.id === item.id)
   );
+
   return [...merged, ...extraItems];
 }
 
@@ -84,7 +85,7 @@ function inferTaskMetadata(
         "Attach the pro-forma Form 1120",
         "Save the fax or mailing acknowledgement",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("1065")) {
@@ -95,7 +96,7 @@ function inferTaskMetadata(
         "Deliver Schedule K-1 to each member",
         "Store the filing acknowledgement",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("1120")) {
@@ -106,7 +107,7 @@ function inferTaskMetadata(
         "Confirm payment or extension details if needed",
         "Store the filing acknowledgement",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("fbar")) {
@@ -120,7 +121,7 @@ function inferTaskMetadata(
         "Prepare FinCEN Form 114 if it applies",
         "Keep the submission confirmation",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (
@@ -134,7 +135,7 @@ function inferTaskMetadata(
         "Submit the report or franchise tax payment",
         "Keep the state confirmation receipt",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("registered agent")) {
@@ -145,7 +146,7 @@ function inferTaskMetadata(
         "Pay or renew the service",
         "Save the renewal confirmation",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("boi")) {
@@ -156,7 +157,7 @@ function inferTaskMetadata(
         "Submit the BOI report if required",
         "Keep the FinCEN confirmation",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   if (lowerTitle.includes("ein")) {
@@ -167,7 +168,7 @@ function inferTaskMetadata(
         "Submit the EIN request",
         "Save the IRS acknowledgement or CP 575 letter",
       ]),
-    } as ComplianceTaskMetadata;
+    };
   }
 
   return {
@@ -179,7 +180,7 @@ function inferTaskMetadata(
           "Store proof of completion",
         ])
       : [],
-  } as ComplianceTaskMetadata;
+  };
 }
 
 export function getTaskMetadata(
@@ -189,7 +190,7 @@ export function getTaskMetadata(
   >
 ) {
   const inferred = inferTaskMetadata(task);
-  const persisted = (task.metadata ?? {}) as ComplianceTaskMetadata;
+  const persisted: ComplianceTaskMetadata = task.metadata ?? {};
 
   return {
     ...inferred,
@@ -252,18 +253,23 @@ export function getDerivedTaskState(
   now = new Date()
 ): DerivedTaskState {
   if (!isTaskVisible(task)) return "hidden";
+
   if (task.status === "completed") return "completed";
 
   const dueDate = new Date(`${task.dueDate}T00:00:00.000Z`);
+
   const nowUtc = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
   );
+
   const diffInDays = Math.floor(
     (dueDate.getTime() - nowUtc.getTime()) / DAY_IN_MS
   );
 
   if (diffInDays < 0) return "overdue";
+
   if (diffInDays <= 30) return "due_soon";
+
   return "upcoming";
 }
 
@@ -279,10 +285,13 @@ export function getFirstThirtyDayChecklist(
   >[]
 ) {
   const saved = llc.filingPreferences?.checklists?.first30Days ?? {};
+
   const hasEINTask = tasks.some(
     (task) => getTaskMetadata(task).filingCode === "ein_application"
   );
+
   const hasCalendarTasks = getVisibleTasks(tasks).length > 0;
+
   const hasOptionalFbar = tasks.some(
     (task) => getTaskMetadata(task).filingCode === "fbar"
   );

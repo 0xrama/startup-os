@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { auditLogs } from "./schema";
+import type { AuditMetadata } from "./schema";
 
 export async function logAudit({
   userId,
@@ -13,7 +14,7 @@ export async function logAudit({
   action: string;
   resourceType?: string;
   resourceId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: AuditMetadata;
   ipAddress?: string;
 }) {
   await db.insert(auditLogs).values({

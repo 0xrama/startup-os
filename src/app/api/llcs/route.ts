@@ -8,6 +8,7 @@ import { requireApiContext } from "@/lib/route-guards";
 
 export async function GET() {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
@@ -21,13 +22,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const context = await requireApiContext({ feature: "llcs" });
+
   if ("response" in context) return context.response;
   const { session } = context;
 
   const body = await request.json();
+
   const encryption = await db.query.userEncryption.findFirst({
     where: eq(userEncryption.userId, session.user.id),
   });
+
   const hasEncryption = !!encryption;
 
   if (hasEncryption && !body.encryptedData) {
@@ -81,7 +85,11 @@ export async function POST(request: NextRequest) {
     action: "llc.created",
     resourceType: "llc",
     resourceId: llc.id,
-    metadata: { name: llc.name, state: llc.state, encrypted: !!body.encryptedData },
+    metadata: {
+      name: llc.name,
+      state: llc.state,
+      encrypted: !!body.encryptedData,
+    },
   });
 
   return NextResponse.json(llc, { status: 201 });

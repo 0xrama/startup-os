@@ -9,12 +9,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
   const { id } = await params;
 
   const access = await requireApiLlcAccess(session.user.id, id);
+
   if ("response" in access) return access.response;
 
   return NextResponse.json(access.access.llc);
@@ -25,17 +27,23 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
   const { id } = await params;
   const body = await request.json();
+
   const encryption = await db.query.userEncryption.findFirst({
     where: eq(userEncryption.userId, session.user.id),
   });
+
   const hasEncryption = !!encryption;
 
-  const access = await requireApiLlcAccess(session.user.id, id, { editable: true });
+  const access = await requireApiLlcAccess(session.user.id, id, {
+    editable: true,
+  });
+
   if ("response" in access) return access.response;
   const llc = access.access.llc;
 

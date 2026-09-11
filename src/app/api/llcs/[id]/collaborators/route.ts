@@ -11,19 +11,27 @@ export async function GET(
 ) {
   try {
     const context = await requireApiContext();
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id } = await params;
     const access = await requireApiLlcAccess(session.user.id, id);
+
     if ("response" in access) return access.response;
 
     const collaborators = await db.query.llcCollaborators.findMany({
       where: eq(llcCollaborators.llcId, id),
     });
+
     return NextResponse.json(collaborators);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to load collaborators" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load collaborators",
+      },
       { status: 500 }
     );
   }
@@ -35,15 +43,28 @@ export async function POST(
 ) {
   try {
     const context = await requireApiContext({ feature: "collaborators" });
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id } = await params;
-    const access = await requireApiLlcAccess(session.user.id, id, { manageable: true });
+
+    const access = await requireApiLlcAccess(session.user.id, id, {
+      manageable: true,
+    });
+
     if ("response" in access) return access.response;
 
     const { email, role } = await request.json();
+
     if (!email || !role) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    if (role !== "owner" && role !== "editor" && role !== "viewer") {
+      return NextResponse.json(
+        { error: "Role must be one of owner, editor, or viewer" },
+        { status: 400 }
+      );
     }
 
     const existing = await db.query.llcCollaborators.findFirst({
@@ -82,7 +103,12 @@ export async function POST(
     return NextResponse.json(collaborator, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to invite collaborator" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to invite collaborator",
+      },
       { status: 500 }
     );
   }

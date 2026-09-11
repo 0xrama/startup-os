@@ -1,7 +1,6 @@
 import { requirePageSession } from "@/lib/access";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { getUserSubscription } from "@/lib/subscription";
-import type { Plan } from "@/lib/plan-limits";
 import { isAdminEmail } from "@/lib/admin";
 
 export default async function DashboardLayout({
@@ -12,10 +11,11 @@ export default async function DashboardLayout({
   const session = await requirePageSession();
   const isAdmin = isAdminEmail(session.user.email);
   const subscription = await getUserSubscription(session.user.id);
+
   const plan = isAdmin
     ? "pro"
     : subscription?.status === "active"
-      ? (subscription.plan as Plan)
+      ? (subscription.plan ?? null)
       : null;
 
   return (

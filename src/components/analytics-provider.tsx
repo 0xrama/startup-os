@@ -6,7 +6,9 @@ import posthog from "posthog-js";
 import { COOKIE_CONSENT_KEY } from "@/components/cookie-consent";
 
 const analyticsEnabled = process.env.NEXT_PUBLIC_FEATURE_ANALYTICS === "true";
+
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+
 const posthogHost =
   process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
 
@@ -36,6 +38,7 @@ function bootPostHog() {
     persistence: "localStorage+cookie",
   });
   posthogBooted = true;
+
   return true;
 }
 

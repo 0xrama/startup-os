@@ -29,11 +29,13 @@ export function FirstThirtyDaysChecklist({
   initialPreferences: FilingPreferences | null | undefined;
 }) {
   const [items, setItems] = useState(initialItems);
+
   const [preferences, setPreferences] = useState<FilingPreferences>({
     remindDaysBefore: initialPreferences?.remindDaysBefore ?? 30,
     channels: initialPreferences?.channels ?? ["email"],
     checklists: initialPreferences?.checklists,
   });
+
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -43,7 +45,7 @@ export function FirstThirtyDaysChecklist({
     const nextPreferences: FilingPreferences = {
       ...preferences,
       checklists: {
-        ...(preferences.checklists ?? {}),
+        ...preferences.checklists,
         first30Days: Object.fromEntries(
           nextItems.map((item) => [item.id, item.checked])
         ),
@@ -74,6 +76,7 @@ export function FirstThirtyDaysChecklist({
     const nextItems = items.map((item) =>
       item.id === itemId ? { ...item, checked: !item.checked } : item
     );
+
     setItems(nextItems);
     persist(nextItems);
   }
@@ -91,10 +94,13 @@ export function FirstThirtyDaysChecklist({
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
             First 30 days
           </p>
-          <h2 className="heading-serif mt-2 text-2xl">Settle the essentials fast</h2>
+          <h2 className="heading-serif mt-2 text-2xl">
+            Settle the essentials fast
+          </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            This replaces the old course. Keep the first month practical: confirm the basics,
-            answer the optional filing questions, and save proof as you go.
+            This replaces the old course. Keep the first month practical:
+            confirm the basics, answer the optional filing questions, and save
+            proof as you go.
           </p>
         </div>
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-background/80 px-4 py-3">

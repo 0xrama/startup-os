@@ -24,18 +24,21 @@ type TaskSeed = {
   recurrenceRule: string | null;
 };
 
-const ANNUAL_REPORT_STATES: Record<string, { month: number; label: string }> = {
-  WY: { month: 0, label: "Due on the 1st day of the anniversary month" },
-  NM: { month: 11, label: "Due within 30 days after anniversary" },
-  FL: { month: 5, label: "Due May 1st annually" },
-  DE: { month: 6, label: "Due June 1st annually" },
-  TX: { month: 5, label: "Due May 15th annually (franchise tax)" },
-  NV: { month: 0, label: "Due on the last day of the anniversary month" },
-  CO: { month: 0, label: "Due in the anniversary month" },
-};
+type AnnualReportWindow = { month: number; label: string };
+
+const ANNUAL_REPORT_STATES = new Map<string, AnnualReportWindow>([
+  ["WY", { month: 0, label: "Due on the 1st day of the anniversary month" }],
+  ["NM", { month: 11, label: "Due within 30 days after anniversary" }],
+  ["FL", { month: 5, label: "Due May 1st annually" }],
+  ["DE", { month: 6, label: "Due June 1st annually" }],
+  ["TX", { month: 5, label: "Due May 15th annually (franchise tax)" }],
+  ["NV", { month: 0, label: "Due on the last day of the anniversary month" }],
+  ["CO", { month: 0, label: "Due in the anniversary month" }],
+]);
 
 function getCurrentTaxYear(): number {
   const now = new Date();
+
   return now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
 }
 
@@ -43,14 +46,17 @@ function nextDueDate(month: number, day: number): string {
   const now = new Date();
   const year = now.getFullYear();
   let due = new Date(year, month, day);
+
   if (due < now) {
     due = new Date(year + 1, month, day);
   }
+
   return due.toISOString().split("T")[0];
 }
 
 function getFormationMonth(formationDate: string | null): number {
   if (!formationDate) return 0;
+
   return new Date(formationDate).getMonth();
 }
 
@@ -58,8 +64,10 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
   const tasks: TaskSeed[] = [];
   const taxYear = getCurrentTaxYear();
   const isForeignOwned = llc.ownerResidency === "non_us";
+
   const isBasicCorporation =
     llc.entityType === "corporation" || llc.taxClassification === "c-corp";
+
   const isMultiMemberLlc = llc.entityType === "multi-member";
   const isSingleMemberLlc = llc.entityType === "single-member";
 
@@ -137,11 +145,14 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
   }
 
   // ─── State: Annual Report ─────────────────────────────────
-  const stateInfo = ANNUAL_REPORT_STATES[llc.state];
+  const stateInfo = ANNUAL_REPORT_STATES.get(llc.state);
+
   if (stateInfo) {
     const reportMonth =
       llc.annualReportMonth ??
-      (stateInfo.month === 0 ? getFormationMonth(llc.formationDate) : stateInfo.month);
+      (stateInfo.month === 0
+        ? getFormationMonth(llc.formationDate)
+        : stateInfo.month);
 
     tasks.push({
       title: `${llc.state} Annual Report / Franchise Tax`,
@@ -173,6 +184,7 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
     boiDeadline.setDate(boiDeadline.getDate() + 90);
 
     const now = new Date();
+
     if (boiDeadline > now) {
       tasks.push({
         title: "File BOI Report (Beneficial Ownership Information)",

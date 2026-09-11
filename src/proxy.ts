@@ -19,6 +19,7 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", pathname);
       const response = NextResponse.redirect(loginUrl);
       response.headers.set("x-request-id", requestId);
+
       return response;
     }
   }
@@ -33,7 +34,9 @@ export async function middleware(request: NextRequest) {
       const response = NextResponse.redirect(
         new URL("/dashboard", request.url)
       );
+
       response.headers.set("x-request-id", requestId);
+
       return response;
     }
   }
@@ -43,11 +46,14 @@ export async function middleware(request: NextRequest) {
       headers: requestHeaders,
     },
   });
+
   response.headers.set("x-request-id", requestId);
+
   return response;
 }
 
 export const proxy = middleware;
+
 export default middleware;
 
 export const config = {

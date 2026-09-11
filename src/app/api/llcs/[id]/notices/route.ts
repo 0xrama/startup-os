@@ -10,10 +10,12 @@ export async function GET(
 ) {
   try {
     const context = await requireApiContext();
+
     if ("response" in context) return context.response;
     const { session } = context;
     const { id } = await params;
     const access = await requireApiLlcAccess(session.user.id, id);
+
     if ("response" in access) return access.response;
 
     const notices = await db.query.noticeCases.findMany({
@@ -23,7 +25,10 @@ export async function GET(
     return NextResponse.json(notices);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to load notices" },
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to load notices",
+      },
       { status: 500 }
     );
   }

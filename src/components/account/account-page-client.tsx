@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +47,7 @@ export function AccountPageClient({
 
   const hasActiveSubscription =
     currentStatus === "active" && Boolean(currentPlan);
+
   const canDelete = !hasActiveSubscription || isAdmin;
 
   const initials = user.name
@@ -65,14 +62,18 @@ export function AccountPageClient({
   async function handleDelete() {
     if (confirmText !== "DELETE") return;
     setDeleting(true);
+
     try {
       const res = await fetch("/api/account", { method: "DELETE" });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         alert(data.error || "Failed to delete account. Please try again.");
         setDeleting(false);
+
         return;
       }
+
       signOut({
         fetchOptions: {
           onSuccess: () => {

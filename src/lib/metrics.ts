@@ -15,6 +15,7 @@ function getMetricStore() {
 export function incrementMetric(name: string, value = 1) {
   const store = getMetricStore();
   store[name] = (store[name] ?? 0) + value;
+
   return store[name];
 }
 

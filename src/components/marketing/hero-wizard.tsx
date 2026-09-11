@@ -223,7 +223,7 @@ export function HeroWizard() {
       )}
 
       <div className="relative z-10 min-h-[260px] flex flex-col justify-center">
-        {steps[step as keyof typeof steps]}
+        {steps[step]}
       </div>
     </div>
   );

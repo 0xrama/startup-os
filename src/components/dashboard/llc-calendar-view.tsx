@@ -66,22 +66,29 @@ export function LlcCalendarView({
 }) {
   const visibleTasks = useMemo(
     () =>
-      [...getVisibleTasks(initialTasks)].sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+      [...getVisibleTasks(initialTasks)].sort((a, b) =>
+        a.dueDate.localeCompare(b.dueDate)
+      ),
     [initialTasks]
   );
+
   const anchorDate = visibleTasks[0]?.dueDate
     ? new Date(`${visibleTasks[0].dueDate}T00:00:00.000Z`)
     : new Date();
+
   const [activeMonth, setActiveMonth] = useState(startOfMonth(anchorDate));
+
   const [selectedDate, setSelectedDate] = useState(
     visibleTasks[0]?.dueDate ?? new Date().toISOString().split("T")[0]
   );
 
   const tasksByDate = useMemo(() => {
     const grouped = new Map<string, ComplianceTaskRecord[]>();
+
     for (const task of visibleTasks) {
       grouped.set(task.dueDate, [...(grouped.get(task.dueDate) ?? []), task]);
     }
+
     return grouped;
   }, [visibleTasks]);
 
@@ -90,10 +97,12 @@ export function LlcCalendarView({
   const monthEnd = endOfMonth(activeMonth);
   const gridStart = new Date(monthStart);
   gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+
   const gridDays = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(gridStart);
     date.setDate(gridStart.getDate() + index);
     const key = date.toISOString().split("T")[0];
+
     return {
       key,
       date,
@@ -103,12 +112,17 @@ export function LlcCalendarView({
     };
   });
 
-  const dueSoonCount = visibleTasks.filter((task) => getDerivedTaskState(task) === "due_soon")
-    .length;
-  const overdueCount = visibleTasks.filter((task) => getDerivedTaskState(task) === "overdue")
-    .length;
-  const completedCount = visibleTasks.filter((task) => getDerivedTaskState(task) === "completed")
-    .length;
+  const dueSoonCount = visibleTasks.filter(
+    (task) => getDerivedTaskState(task) === "due_soon"
+  ).length;
+
+  const overdueCount = visibleTasks.filter(
+    (task) => getDerivedTaskState(task) === "overdue"
+  ).length;
+
+  const completedCount = visibleTasks.filter(
+    (task) => getDerivedTaskState(task) === "completed"
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -119,8 +133,8 @@ export function LlcCalendarView({
           </p>
           <h1 className="heading-serif mt-2 text-3xl">Compliance calendar</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Month view for {llcName}. Click a day to inspect every filing, renewal, or task
-            attached to it.
+            Month view for {llcName}. Click a day to inspect every filing,
+            renewal, or task attached to it.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -144,8 +158,8 @@ export function LlcCalendarView({
           <CalendarDays className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
           <h2 className="text-lg font-semibold">No visible tasks yet</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Tasks will appear here once your LLC profile creates them or once you add them
-            manually.
+            Tasks will appear here once your LLC profile creates them or once
+            you add them manually.
           </p>
         </div>
       ) : (
@@ -153,9 +167,12 @@ export function LlcCalendarView({
           <section className="card-elevated border border-border/70 p-4 sm:p-6">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold">{formatMonth(activeMonth)}</h2>
+                <h2 className="text-xl font-semibold">
+                  {formatMonth(activeMonth)}
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  A proper month layout so dates read like a real calendar, not a loose list.
+                  A proper month layout so dates read like a real calendar, not
+                  a loose list.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -164,7 +181,11 @@ export function LlcCalendarView({
                   size="icon-sm"
                   onClick={() =>
                     setActiveMonth(
-                      new Date(activeMonth.getFullYear(), activeMonth.getMonth() - 1, 1)
+                      new Date(
+                        activeMonth.getFullYear(),
+                        activeMonth.getMonth() - 1,
+                        1
+                      )
                     )
                   }
                   aria-label="Previous month"
@@ -186,7 +207,11 @@ export function LlcCalendarView({
                   size="icon-sm"
                   onClick={() =>
                     setActiveMonth(
-                      new Date(activeMonth.getFullYear(), activeMonth.getMonth() + 1, 1)
+                      new Date(
+                        activeMonth.getFullYear(),
+                        activeMonth.getMonth() + 1,
+                        1
+                      )
                     )
                   }
                   aria-label="Next month"
@@ -221,7 +246,8 @@ export function LlcCalendarView({
                       isSelected
                         ? "border-primary bg-primary/6"
                         : "border-border bg-background hover:border-primary/30 hover:bg-secondary/40",
-                      !day.isCurrentMonth && "bg-secondary/30 text-muted-foreground"
+                      !day.isCurrentMonth &&
+                        "bg-secondary/30 text-muted-foreground"
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -229,14 +255,17 @@ export function LlcCalendarView({
                         className={cn(
                           "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
                           day.isToday && "bg-primary text-primary-foreground",
-                          !day.isToday && day.isCurrentMonth && "bg-secondary/70"
+                          !day.isToday &&
+                            day.isCurrentMonth &&
+                            "bg-secondary/70"
                         )}
                       >
                         {day.date.getDate()}
                       </span>
                       {day.tasks.length > 0 ? (
                         <span className="text-[11px] text-muted-foreground">
-                          {day.tasks.length} item{day.tasks.length > 1 ? "s" : ""}
+                          {day.tasks.length} item
+                          {day.tasks.length > 1 ? "s" : ""}
                         </span>
                       ) : null}
                     </div>
@@ -244,15 +273,20 @@ export function LlcCalendarView({
                     <div className="mt-3 space-y-1.5">
                       {day.tasks.slice(0, 3).map((task) => {
                         const taskState = getDerivedTaskState(task);
+
                         return (
                           <div
                             key={task.id}
                             className={cn(
                               "rounded-xl px-2 py-1 text-[11px] leading-tight",
-                              taskState === "completed" && "bg-[#2D6A4F]/10 text-[#2D6A4F]",
-                              taskState === "overdue" && "bg-destructive/10 text-destructive",
-                              taskState === "due_soon" && "bg-[#B45309]/10 text-[#B45309]",
-                              taskState === "upcoming" && "bg-secondary text-foreground"
+                              taskState === "completed" &&
+                                "bg-[#2D6A4F]/10 text-[#2D6A4F]",
+                              taskState === "overdue" &&
+                                "bg-destructive/10 text-destructive",
+                              taskState === "due_soon" &&
+                                "bg-[#B45309]/10 text-[#B45309]",
+                              taskState === "upcoming" &&
+                                "bg-secondary text-foreground"
                             )}
                           >
                             <p className="line-clamp-2">{task.title}</p>
@@ -276,9 +310,12 @@ export function LlcCalendarView({
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
                 Agenda
               </p>
-              <h2 className="mt-2 text-2xl font-semibold">{formatLongDate(selectedDate)}</h2>
+              <h2 className="mt-2 text-2xl font-semibold">
+                {formatLongDate(selectedDate)}
+              </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                This is the day-by-day detail panel, similar to the agenda rail in calendar apps.
+                This is the day-by-day detail panel, similar to the agenda rail
+                in calendar apps.
               </p>
             </div>
 
@@ -290,8 +327,12 @@ export function LlcCalendarView({
               <div className="space-y-3">
                 {selectedTasks.map((task) => {
                   const taskState = getDerivedTaskState(task);
+
                   return (
-                    <div key={task.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div
+                      key={task.id}
+                      className="rounded-2xl border border-border bg-card p-4"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5">{stateIcon(taskState)}</span>
@@ -305,14 +346,20 @@ export function LlcCalendarView({
                           </div>
                         </div>
                         <Badge
-                          variant={taskState === "overdue" ? "destructive" : "secondary"}
+                          variant={
+                            taskState === "overdue"
+                              ? "destructive"
+                              : "secondary"
+                          }
                           className="capitalize"
                         >
                           {getTaskStatusLabel(taskState)}
                         </Badge>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        {task.category ? <span>{task.category.replaceAll("_", " ")}</span> : null}
+                        {task.category ? (
+                          <span>{task.category.replaceAll("_", " ")}</span>
+                        ) : null}
                         <span>Due {task.dueDate}</span>
                       </div>
                     </div>

@@ -12,6 +12,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const context = await requireApiContext();
+
   if ("response" in context) return context.response;
   const { session } = context;
 
@@ -28,6 +29,7 @@ export async function DELETE(
   const llcAccess = await requireApiLlcAccess(session.user.id, doc.llcId, {
     editable: true,
   });
+
   if ("response" in llcAccess) return llcAccess.response;
 
   await deleteObject(doc.fileKey);

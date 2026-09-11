@@ -5,7 +5,11 @@ import { complianceTasks, documents } from "./schema";
 import { eq } from "drizzle-orm";
 import { getLlcAccess } from "./access";
 import { getVisibleTasks } from "./compliance-task-details";
-import { getDocumentSearchResults, searchKnowledgeBase, toCitation } from "./knowledge";
+import {
+  getDocumentSearchResults,
+  searchKnowledgeBase,
+  toCitation,
+} from "./knowledge";
 
 export function createAssistantTools(userId: string, llcId?: string) {
   return {
@@ -13,10 +17,14 @@ export function createAssistantTools(userId: string, llcId?: string) {
       description:
         "Get the user's entity profile including entity type, founder residency, state, EIN status, tax classification, members, and filing preferences.",
       inputSchema: z.object({
-        llcId: z.string().optional().describe("Specific LLC ID, or uses the current context LLC"),
+        llcId: z
+          .string()
+          .optional()
+          .describe("Specific LLC ID, or uses the current context LLC"),
       }),
       execute: async ({ llcId: targetId }) => {
         const id = targetId || llcId;
+
         if (!id) return { error: "No LLC specified" };
 
         const access = await getLlcAccess(userId, id);
@@ -49,10 +57,12 @@ export function createAssistantTools(userId: string, llcId?: string) {
       }),
       execute: async ({ llcId: targetId, includeCompleted }) => {
         const id = targetId || llcId;
+
         if (!id) return { error: "No LLC specified" };
 
         const access = await getLlcAccess(userId, id);
         const llc = access?.llc;
+
         if (!llc) return { error: "LLC not found" };
 
         let tasks = await db
@@ -87,7 +97,10 @@ export function createAssistantTools(userId: string, llcId?: string) {
         "Search the user's uploaded documents by name or category. Useful for finding specific records like EIN letters, operating agreements, or tax returns.",
       inputSchema: z.object({
         llcId: z.string().optional(),
-        query: z.string().optional().describe("Search term to match document names"),
+        query: z
+          .string()
+          .optional()
+          .describe("Search term to match document names"),
         category: z
           .enum([
             "operating_agreement",
@@ -102,10 +115,12 @@ export function createAssistantTools(userId: string, llcId?: string) {
       }),
       execute: async ({ llcId: targetId, query, category }) => {
         const id = targetId || llcId;
+
         if (!id) return { error: "No LLC specified" };
 
         const access = await getLlcAccess(userId, id);
         const llc = access?.llc;
+
         if (!llc) return { error: "LLC not found" };
 
         let docs = query
@@ -148,8 +163,10 @@ export function createAssistantTools(userId: string, llcId?: string) {
       }),
       execute: async ({ query, llcId: targetId }) => {
         const id = targetId || llcId;
+
         if (id) {
           const access = await getLlcAccess(userId, id);
+
           if (!access?.llc) return { error: "LLC not found" };
         }
 
@@ -178,10 +195,19 @@ export function createAssistantTools(userId: string, llcId?: string) {
           .describe(
             'The form or filing name, e.g., "Form 5472", "Annual Report", "FBAR", "Form 1065", "BOI Report"'
           ),
-        state: z.string().optional().describe("State code if state-specific, e.g., WY, FL, DE"),
+        state: z
+          .string()
+          .optional()
+          .describe("State code if state-specific, e.g., WY, FL, DE"),
       }),
       execute: async ({ formName, state }) => {
-        const instructions: Record<string, { overview: string; steps: string[]; tips: string[] }> = {
+        type FormInstructions = {
+          overview: string;
+          steps: string[];
+          tips: string[];
+        };
+
+        const instructions = {
           "Form 1120": {
             overview:
               "Form 1120 is the U.S. Corporation Income Tax Return for domestic corporations and certain entities that elected to be taxed as corporations. It is not the default annual return for every LLC.",
@@ -280,16 +306,18 @@ export function createAssistantTools(userId: string, llcId?: string) {
               "Penalties for non-compliance can still be significant when a filing is actually required.",
             ],
           },
-        };
+        } satisfies Record<string, FormInstructions>;
 
-        const key = Object.keys(instructions).find((k) =>
-          formName.toLowerCase().includes(k.toLowerCase())
+        const match = Object.entries(instructions).find(([form]) =>
+          formName.toLowerCase().includes(form.toLowerCase())
         );
 
-        if (key) {
+        if (match) {
+          const [key, instruction] = match;
+
           return {
             formName: key,
-            ...instructions[key],
+            ...instruction,
             disclaimer:
               "This is general informational guidance, not legal or tax advice. Consult a qualified professional for your specific situation.",
           };

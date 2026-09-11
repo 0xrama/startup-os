@@ -28,9 +28,11 @@ export default async function DashboardPage() {
     .select()
     .from(llcs)
     .where(eq(llcs.userId, session.user.id));
+
   const collaboratorRows = await db.query.llcCollaborators.findMany({
     where: eq(llcCollaborators.userId, session.user.id),
   });
+
   const collaboratorLlcs =
     collaboratorRows.length > 0
       ? await db.query.llcs.findMany({
@@ -41,6 +43,7 @@ export default async function DashboardPage() {
             ),
         })
       : [];
+
   const visibleLlcs = [...userLlcs, ...collaboratorLlcs].filter(
     (llc, index, list) =>
       list.findIndex((entry) => entry.id === llc.id) === index
@@ -72,6 +75,7 @@ export default async function DashboardPage() {
       .select()
       .from(documents)
       .where(eq(documents.userId, session.user.id));
+
     docCount = docs.length;
   }
 
@@ -87,6 +91,7 @@ export default async function DashboardPage() {
       (pendingCountByLlc.get(task.llcId) ?? 0) + 1
     );
     const next = nextDeadlineByLlc.get(task.llcId);
+
     if (
       next === undefined ||
       (task.dueDate && (next === null || task.dueDate < next))
@@ -199,6 +204,7 @@ export default async function DashboardPage() {
               {visibleLlcs.map((llc) => {
                 const pendingCount = pendingCountByLlc.get(llc.id) ?? 0;
                 const nextDeadline = nextDeadlineByLlc.get(llc.id) ?? null;
+
                 return (
                   <StaggerItem key={llc.id}>
                     <Link

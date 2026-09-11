@@ -27,6 +27,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "coverage/**",
     "docs/reference/**",
+    // Vendored oxlint plugin, loaded by oxlint's own transpiler (not tsc):
+    "tools/oxlint/anti-slop/**",
+    // Installed agent assets, not application source:
+    ".agents/**",
   ]),
 ]);
 

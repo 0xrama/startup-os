@@ -1,6 +1,9 @@
 const PBKDF2_ITERATIONS = 310_000;
+
 const AES_ALGORITHM = "AES-GCM";
+
 const TEXT_ENCODER = new TextEncoder();
+
 const TEXT_DECODER = new TextDecoder();
 
 export type CipherPayload = {
@@ -38,6 +41,7 @@ function randomBytes(length: number) {
 function asBufferSource(bytes: Uint8Array) {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
+
   return copy.buffer;
 }
 
@@ -53,6 +57,7 @@ async function importAesKey(raw: Uint8Array, usages: KeyUsage[]) {
 
 async function exportAesKey(key: CryptoKey) {
   const raw = await getCrypto().subtle.exportKey("raw", key);
+
   return new Uint8Array(raw);
 }
 
@@ -79,8 +84,12 @@ async function deriveSecretKey(secret: string, salt: Uint8Array) {
   );
 }
 
-async function encryptBytes(key: CryptoKey, data: Uint8Array): Promise<CipherPayload> {
+async function encryptBytes(
+  key: CryptoKey,
+  data: Uint8Array
+): Promise<CipherPayload> {
   const iv = randomBytes(12);
+
   const ciphertext = await getCrypto().subtle.encrypt(
     { name: AES_ALGORITHM, iv },
     key,
@@ -110,7 +119,11 @@ export function isValidPin(pin: string) {
 
 export function generateRecoveryCode() {
   const bytes = randomBytes(12);
-  const chars = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0").toUpperCase()).join("");
+
+  const chars = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0").toUpperCase()
+  ).join("");
+
   return chars.match(/.{1,4}/g)?.join("-") ?? chars;
 }
 
@@ -122,7 +135,10 @@ export async function generateMasterKey() {
   );
 }
 
-export async function wrapMasterKey(masterKey: CryptoKey, secret: string): Promise<WrappedMasterKeyPayload> {
+export async function wrapMasterKey(
+  masterKey: CryptoKey,
+  secret: string
+): Promise<WrappedMasterKeyPayload> {
   const salt = randomBytes(16);
   const wrappingKey = await deriveSecretKey(secret, salt);
   const rawMasterKey = await exportAesKey(masterKey);
@@ -134,26 +150,49 @@ export async function wrapMasterKey(masterKey: CryptoKey, secret: string): Promi
   };
 }
 
-export async function unwrapMasterKey(payload: WrappedMasterKeyPayload, secret: string) {
+export async function unwrapMasterKey(
+  payload: WrappedMasterKeyPayload,
+  secret: string
+) {
   const wrappingKey = await deriveSecretKey(secret, fromBase64(payload.salt));
   const rawMasterKey = await decryptBytes(wrappingKey, payload);
+
   return importAesKey(rawMasterKey, ["encrypt", "decrypt"]);
 }
 
-export async function encryptJson<T>(masterKey: CryptoKey, value: T): Promise<CipherPayload> {
+export async function encryptJson<T>(
+  masterKey: CryptoKey,
+  value: T
+): Promise<CipherPayload> {
   return encryptBytes(masterKey, TEXT_ENCODER.encode(JSON.stringify(value)));
 }
 
-export async function decryptJson<T>(masterKey: CryptoKey, payload: CipherPayload): Promise<T> {
+export async function decryptJson<T>(
+  masterKey: CryptoKey,
+  payload: CipherPayload
+): Promise<T> {
   const plaintext = await decryptBytes(masterKey, payload);
+
+  // SAFETY: every CipherPayload handled here was produced by encryptJson<T>
+  // under the same key, and AES-GCM authentication rejects tampered
+  // ciphertexts, so the decrypted JSON keeps the T shape it was written with.
   return JSON.parse(TEXT_DECODER.decode(plaintext)) as T;
 }
 
-export async function encryptDocumentBlob(masterKey: CryptoKey, file: File | Blob) {
+export async function encryptDocumentBlob(
+  masterKey: CryptoKey,
+  file: File | Blob
+) {
   const dataKey = await generateMasterKey();
-  const wrappedFileKey = await encryptBytes(masterKey, await exportAesKey(dataKey));
+
+  const wrappedFileKey = await encryptBytes(
+    masterKey,
+    await exportAesKey(dataKey)
+  );
+
   const iv = randomBytes(12);
   const plaintext = new Uint8Array(await file.arrayBuffer());
+
   const ciphertext = await getCrypto().subtle.encrypt(
     { name: AES_ALGORITHM, iv },
     dataKey,
@@ -179,6 +218,7 @@ export async function decryptDocumentBlob(
   const rawDataKey = await decryptBytes(masterKey, wrappedFileKey);
   const dataKey = await importAesKey(rawDataKey, ["encrypt", "decrypt"]);
   const ciphertext = await blob.arrayBuffer();
+
   const plaintext = await getCrypto().subtle.decrypt(
     { name: AES_ALGORITHM, iv: fromBase64(iv) },
     dataKey,
@@ -194,6 +234,7 @@ export async function persistMasterKey(masterKey: CryptoKey) {
 
 export async function restoreMasterKey() {
   const stored = sessionStorage.getItem(SESSION_KEY);
+
   if (!stored) return null;
 
   return importAesKey(fromBase64(stored), ["encrypt", "decrypt"]);

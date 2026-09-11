@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     case "subscription.created":
     case "subscription.updated": {
       const userId = data.metadata?.userId;
+
       if (!userId) break;
 
       await db
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
 
     case "subscription.canceled": {
       const userId = data.metadata?.userId;
+
       if (!userId) break;
 
       await db

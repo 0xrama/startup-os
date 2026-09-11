@@ -25,6 +25,7 @@ export async function scheduleTaskReminders(taskIds: string[], userId: string) {
     const reminderDays = llc.filingPreferences?.remindDaysBefore
       ? [llc.filingPreferences.remindDaysBefore]
       : DEFAULT_REMINDER_DAYS;
+
     const channels = llc.filingPreferences?.channels?.length
       ? llc.filingPreferences.channels
       : ["email"];
@@ -36,10 +37,12 @@ export async function scheduleTaskReminders(taskIds: string[], userId: string) {
       for (const channel of channels) {
         if (channel === "whatsapp") {
           const access = await checkFeatureAccess(userId, "whatsapp");
+
           if (!access.allowed) continue;
         }
 
         const idempotencyKey = `${task.id}:${channel}:${scheduledAt.toISOString()}`;
+
         const existing = await db.query.reminders.findFirst({
           where: eq(reminders.idempotencyKey, idempotencyKey),
         });
@@ -79,11 +82,13 @@ export async function processPendingReminders(batchSize = 20) {
     const task = await db.query.complianceTasks.findFirst({
       where: eq(complianceTasks.id, reminder.taskId),
     });
+
     if (!task) continue;
 
     const llc = await db.query.llcs.findFirst({
       where: eq(llcs.id, task.llcId),
     });
+
     const recipient = await db.query.user.findFirst({
       where: eq(user.id, reminder.userId),
     });
@@ -96,7 +101,7 @@ export async function processPendingReminders(batchSize = 20) {
         status: "processing",
         processingStartedAt: new Date(),
         updatedAt: new Date(),
-      } as never)
+      })
       .where(eq(reminders.id, reminder.id));
 
     try {
@@ -121,6 +126,7 @@ export async function processPendingReminders(batchSize = 20) {
           .where(eq(reminders.id, reminder.id));
       } else {
         const access = await checkFeatureAccess(reminder.userId, "whatsapp");
+
         if (!access.allowed || !recipient.phone || !recipient.whatsappOptedIn) {
           throw new Error("WhatsApp delivery not available for this user.");
         }

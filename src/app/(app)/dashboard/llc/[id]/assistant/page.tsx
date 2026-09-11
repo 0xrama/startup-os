@@ -32,9 +32,11 @@ export default function AssistantPage() {
   const [threadError, setThreadError] = useState<string | null>(null);
   const [messageError, setMessageError] = useState<string | null>(null);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+
   const [assistantCapLabel, setAssistantCapLabel] = useState<string | null>(
     null
   );
+
   const [isAdminBypass, setIsAdminBypass] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesViewportRef = useRef<HTMLDivElement>(null);
@@ -49,16 +51,12 @@ export default function AssistantPage() {
         citations: Citation[] | null;
       }>
     ) =>
-      data
-        .filter(
-          (message) => message.role === "user" || message.role === "assistant"
-        )
-        .map((message) => ({
-          id: message.id,
-          role: message.role,
-          content: message.content ?? "",
-          citations: message.citations,
-        })),
+      data.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content ?? "",
+        citations: message.citations,
+      })),
     []
   );
 
@@ -67,10 +65,15 @@ export default function AssistantPage() {
       const response = await fetch("/api/billing/status", {
         cache: "no-store",
       });
+
       if (!response.ok) return;
+
+      // SAFETY: /api/billing/status is owned by this app and serializes the
+      // BillingStatus shape defined beside its route handler.
       const data = (await response.json()) as BillingStatus;
       setIsAdminBypass(data.adminBypass === true);
       const cap = data.limits?.maxAssistantQueries;
+
       if (Number.isFinite(cap)) {
         setAssistantCapLabel(`${cap} questions/mo`);
       } else {
@@ -96,9 +99,12 @@ export default function AssistantPage() {
           const error = await res
             .json()
             .catch(() => ({ error: "Unable to load thread" }));
+
           throw new Error(error.error ?? "Unable to load thread");
         }
 
+        // SAFETY: the thread endpoint returns messages written by
+        // assistant-store, whose roles are the "user" | "assistant" union.
         const data = (await res.json()) as {
           messages: Array<{
             id: string;
@@ -135,14 +141,18 @@ export default function AssistantPage() {
           const error = await res
             .json()
             .catch(() => ({ error: "Unable to load threads" }));
+
           throw new Error(error.error ?? "Unable to load threads");
         }
 
+        // SAFETY: the conversations endpoint serializes Conversation rows
+        // created by assistant-store.
         const data = (await res.json()) as Conversation[];
         setConversations(data);
 
         if (options?.selectLatest && data[0]) {
           await selectConversation(data[0].id);
+
           return;
         }
 
@@ -166,12 +176,14 @@ export default function AssistantPage() {
 
   useEffect(() => {
     const viewport = messagesViewportRef.current;
+
     if (!viewport) return;
     viewport.scrollTop = viewport.scrollHeight;
   }, [messages, isLoading]);
 
   useEffect(() => {
     const textarea = composerRef.current;
+
     if (!textarea) return;
     textarea.style.height = "0px";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
@@ -231,6 +243,7 @@ export default function AssistantPage() {
       }
 
       const reader = res.body?.getReader();
+
       if (!reader) {
         throw new Error("No response stream available");
       }
@@ -240,6 +253,7 @@ export default function AssistantPage() {
 
       while (true) {
         const { done, value } = await reader.read();
+
         if (done) break;
         assistantContent += decoder.decode(value, { stream: true });
         setMessages((prev) =>

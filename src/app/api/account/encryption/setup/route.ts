@@ -12,11 +12,14 @@ function isWrappedPayload(value: unknown): value is {
   iv: string;
   ciphertext: string;
 } {
-  return !!value && typeof value === "object"
-    && "version" in value
-    && "salt" in value
-    && "iv" in value
-    && "ciphertext" in value;
+  return (
+    value !== null &&
+    value instanceof Object &&
+    "version" in value &&
+    "salt" in value &&
+    "iv" in value &&
+    "ciphertext" in value
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -31,8 +34,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    if (!isWrappedPayload(body.pinWrappedMasterKey) || !isWrappedPayload(body.recoveryWrappedMasterKey)) {
-      return NextResponse.json({ error: "Invalid encryption payload" }, { status: 400 });
+    if (
+      !isWrappedPayload(body.pinWrappedMasterKey) ||
+      !isWrappedPayload(body.recoveryWrappedMasterKey)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid encryption payload" },
+        { status: 400 }
+      );
     }
 
     const existing = await db.query.userEncryption.findFirst({
@@ -40,7 +49,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json({ error: "Encryption already configured" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Encryption already configured" },
+        { status: 409 }
+      );
     }
 
     await db.insert(userEncryption).values({
@@ -59,6 +71,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Vault setup is temporarily unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Vault setup is temporarily unavailable" },
+      { status: 503 }
+    );
   }
 }
