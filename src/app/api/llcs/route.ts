@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const context = await requireApiContext({ feature: "llcs" });
+  const context = await requireApiContext();
 
   if ("response" in context) return context.response;
   const { session } = context;

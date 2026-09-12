@@ -3,7 +3,6 @@ import { db } from "./db";
 import { complianceTasks, llcs, reminders, user } from "./schema";
 import { sendReminderEmail } from "./email";
 import { sendWhatsAppMessage } from "./whatsapp";
-import { checkFeatureAccess } from "./feature-gate";
 import { logAudit } from "./audit";
 
 const DEFAULT_REMINDER_DAYS = [30, 14, 7, 1];
@@ -35,12 +34,6 @@ export async function scheduleTaskReminders(taskIds: string[], userId: string) {
       scheduledAt.setUTCDate(scheduledAt.getUTCDate() - offsetDays);
 
       for (const channel of channels) {
-        if (channel === "whatsapp") {
-          const access = await checkFeatureAccess(userId, "whatsapp");
-
-          if (!access.allowed) continue;
-        }
-
         const idempotencyKey = `${task.id}:${channel}:${scheduledAt.toISOString()}`;
 
         const existing = await db.query.reminders.findFirst({
@@ -125,9 +118,7 @@ export async function processPendingReminders(batchSize = 20) {
           })
           .where(eq(reminders.id, reminder.id));
       } else {
-        const access = await checkFeatureAccess(reminder.userId, "whatsapp");
-
-        if (!access.allowed || !recipient.phone || !recipient.whatsappOptedIn) {
+        if (!recipient.phone || !recipient.whatsappOptedIn) {
           throw new Error("WhatsApp delivery not available for this user.");
         }
 

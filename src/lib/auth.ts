@@ -50,9 +50,24 @@ export const auth = betterAuth({
   baseURL: authBaseUrl,
   trustedOrigins,
   database: drizzleAdapter(db, {
-    provider: "sqlite",
+    provider: "pg",
     schema,
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (newUser) => {
+          const existing = await db.query.user.findFirst();
+
+          if (existing) {
+            return false;
+          }
+
+          return { data: newUser };
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
   },

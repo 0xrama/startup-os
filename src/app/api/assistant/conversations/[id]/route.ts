@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireApiContext({ feature: "assistant" });
+    const context = await requireApiContext();
 
     if ("response" in context) return context.response;
     const { session } = context;

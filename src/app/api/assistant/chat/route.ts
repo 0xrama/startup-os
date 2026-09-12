@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
-import { model, SYSTEM_PROMPT } from "@/lib/ai";
+import { getChatModel, SYSTEM_PROMPT } from "@/lib/ai";
 import { createAssistantTools } from "@/lib/ai-tools";
 import { seedOfficialKnowledge } from "@/lib/document-intelligence";
 import {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const requestId = resolveRequestId(request);
 
   try {
-    const context = await requireApiContext({ feature: "assistant" });
+    const context = await requireApiContext();
 
     if ("response" in context) return context.response;
     const { session } = context;
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const tools = createAssistantTools(session.user.id, llcId);
 
     const result = streamText({
-      model,
+      model: await getChatModel(),
       system: `${SYSTEM_PROMPT}\n\n${finalRetrievalContext}`,
       messages: priorMessages,
       tools,

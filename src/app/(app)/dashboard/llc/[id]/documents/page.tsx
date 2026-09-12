@@ -58,13 +58,6 @@ type Document = {
   fileIv?: string | null;
 };
 
-type BillingStatus = {
-  limits?: {
-    documentIntelligence: boolean;
-    noticeTriage: boolean;
-  };
-};
-
 type NoticeCase = {
   id: string;
   summary: string | null;
@@ -113,10 +106,6 @@ export default function DocumentsPage() {
   const [category, setCategory] = useState("other");
   const [notices, setNotices] = useState<NoticeCase[]>([]);
 
-  const [documentIntelligenceEnabled, setDocumentIntelligenceEnabled] =
-    useState(false);
-
-  const [noticeTriageEnabled, setNoticeTriageEnabled] = useState(false);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   const fetchDocs = useCallback(async () => {
@@ -184,21 +173,6 @@ export default function DocumentsPage() {
       .catch(() => undefined);
   }, [llcId]);
 
-  useEffect(() => {
-    void fetch("/api/billing/status", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        // SAFETY: /api/billing/status is owned by this app and serializes the
-        // BillingStatus shape defined beside its route handler.
-        const status = data as BillingStatus | null;
-        setDocumentIntelligenceEnabled(
-          Boolean(status?.limits?.documentIntelligence)
-        );
-        setNoticeTriageEnabled(Boolean(status?.limits?.noticeTriage));
-      })
-      .catch(() => undefined);
-  }, []);
-
   async function handleUpload() {
     if (!selectedFile || !masterKey) return;
     setUploading(true);
@@ -246,20 +220,18 @@ export default function DocumentsPage() {
 
       if (!uploadRes.ok) throw new Error("Upload failed");
 
-      if (documentIntelligenceEnabled) {
-        const processRes = await fetch(`/api/documents/${documentId}/process`, {
-          method: "POST",
-        });
+      const processRes = await fetch(`/api/documents/${documentId}/process`, {
+        method: "POST",
+      });
 
-        if (!processRes.ok) {
-          const processData = await processRes.json().catch(() => ({
-            error: "Document processing is unavailable right now.",
-          }));
+      if (!processRes.ok) {
+        const processData = await processRes.json().catch(() => ({
+          error: "Document processing is unavailable right now.",
+        }));
 
-          setGateMessage(
-            processData.error ?? "Document processing is unavailable right now."
-          );
-        }
+        setGateMessage(
+          processData.error ?? "Document processing is unavailable right now."
+        );
       }
 
       // 3. Add to list
@@ -493,11 +465,6 @@ export default function DocumentsPage() {
                   <Landmark className="h-5 w-5 text-primary" />
                   Notice Triage
                 </h2>
-                {!noticeTriageEnabled ? (
-                  <Badge variant="secondary" className="w-fit text-xs">
-                    Pro only
-                  </Badge>
-                ) : null}
               </div>
               <div className="space-y-3">
                 {notices.map((notice) => (

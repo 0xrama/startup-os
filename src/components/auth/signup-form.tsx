@@ -1,17 +1,18 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "@/lib/auth-client";
+import { signUp } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
-function LoginPageContent() {
+export function SignupForm() {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -22,11 +23,11 @@ function LoginPageContent() {
     setError("");
     setLoading(true);
 
-    await signIn.email(
-      { email, password },
+    await signUp.email(
+      { name, email, password },
       {
         onError: (ctx) => {
-          setError(ctx.error.message || "Invalid credentials");
+          setError(ctx.error.message || "Something went wrong");
           setLoading(false);
         },
         onSuccess: () => {
@@ -43,9 +44,9 @@ function LoginPageContent() {
         <div className="lg:hidden mb-8">
           <span className="heading-serif text-xl">Pax</span>
         </div>
-        <h1 className="heading-serif text-3xl mb-2">Welcome back</h1>
+        <h1 className="heading-serif text-3xl mb-2">Create your account</h1>
         <p className="text-sm text-muted-foreground">
-          Sign in to your workspace.
+          Create your account and secure your vault.
         </p>
       </div>
 
@@ -55,6 +56,20 @@ function LoginPageContent() {
             {error}
           </div>
         )}
+
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-sm font-medium">
+            Full name
+          </Label>
+          <Input
+            id="name"
+            placeholder="Jane Doe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="h-11"
+          />
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium">
@@ -78,9 +93,11 @@ function LoginPageContent() {
           <Input
             id="password"
             type="password"
+            placeholder="Min 8 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            minLength={8}
             className="h-11"
           />
         </div>
@@ -93,10 +110,10 @@ function LoginPageContent() {
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Signing in…
+              Creating account…
             </>
           ) : (
-            "Sign in"
+            "Create account"
           )}
         </Button>
 
@@ -109,26 +126,18 @@ function LoginPageContent() {
           </div>
         </div>
 
-        <GoogleAuthButton mode="signin" />
+        <GoogleAuthButton mode="signup" />
 
         <p className="text-sm text-muted-foreground text-center pt-2">
-          Don&apos;t have an account?{" "}
+          Already have an account?{" "}
           <Link
-            href="/signup"
+            href="/login"
             className="text-primary font-medium hover:underline"
           >
-            Sign up
+            Sign in
           </Link>
         </p>
       </form>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginPageContent />
-    </Suspense>
   );
 }

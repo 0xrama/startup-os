@@ -7,12 +7,12 @@ import {
   FileText,
   CalendarDays,
   MessageSquare,
-  CreditCard,
   Building2,
   FolderOpen,
   BookOpen,
   LogOut,
   Menu,
+  Settings,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { Plan } from "@/lib/plan-limits";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Billing", href: "/dashboard/settings/billing", icon: CreditCard },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 const llcNavItems = [
@@ -44,18 +43,14 @@ const llcNavItems = [
 
 type DashboardShellProps = {
   children: React.ReactNode;
-  plan: Plan;
   userName: string;
-  isAdmin?: boolean;
 };
 
 type NavContentProps = {
   llcId?: string;
   mobile?: boolean;
   pathname: string;
-  plan: Plan;
   userName: string;
-  isAdmin: boolean;
   onSignOut: () => void;
 };
 
@@ -98,9 +93,7 @@ function DashboardNavContent({
   llcId,
   mobile = false,
   pathname,
-  plan,
   userName,
-  isAdmin,
   onSignOut,
 }: NavContentProps) {
   return (
@@ -152,13 +145,6 @@ function DashboardNavContent({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-medium">{userName}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {isAdmin
-                ? "Admin"
-                : plan
-                  ? `${plan.charAt(0).toUpperCase() + plan.slice(1)} plan`
-                  : "No plan"}
-            </p>
           </div>
         </div>
         <button
@@ -173,12 +159,7 @@ function DashboardNavContent({
   );
 }
 
-export function DashboardShell({
-  children,
-  plan,
-  userName,
-  isAdmin = false,
-}: DashboardShellProps) {
+export function DashboardShell({ children, userName }: DashboardShellProps) {
   const pathname = usePathname();
   const { lock } = useEncryption();
 
@@ -233,9 +214,7 @@ export function DashboardShell({
                   llcId={llcId}
                   mobile
                   pathname={pathname}
-                  plan={plan}
                   userName={userName}
-                  isAdmin={isAdmin}
                   onSignOut={handleSignOut}
                 />
               </div>
@@ -261,9 +240,7 @@ export function DashboardShell({
           <DashboardNavContent
             llcId={llcId}
             pathname={pathname}
-            plan={plan}
             userName={userName}
-            isAdmin={isAdmin}
             onSignOut={handleSignOut}
           />
         </aside>

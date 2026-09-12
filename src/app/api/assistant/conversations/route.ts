@@ -4,7 +4,7 @@ import { requireApiContext, requireApiLlcAccess } from "@/lib/route-guards";
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireApiContext({ feature: "assistant" });
+    const context = await requireApiContext();
 
     if ("response" in context) return context.response;
     const { session } = context;

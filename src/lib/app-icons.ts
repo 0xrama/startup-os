@@ -14,8 +14,6 @@ import {
   ReceiptText,
   ScrollText,
   ShieldCheck,
-  UserPlus,
-  Users,
 } from "lucide-react";
 
 export function getDashboardMetricIcon(
@@ -35,12 +33,7 @@ export function getDashboardMetricIcon(
 
 export function getWorkspaceSectionIcon(
   section:
-    | "overview"
-    | "documents"
-    | "calendar"
-    | "filings"
-    | "assistant"
-    | "course"
+    "overview" | "documents" | "calendar" | "filings" | "assistant" | "course"
 ): LucideIcon {
   switch (section) {
     case "overview":
@@ -100,14 +93,5 @@ export function getCitationSourceIcon(sourceType: string): LucideIcon {
       return Landmark;
     default:
       return Files;
-  }
-}
-
-export function getCollaboratorStatusIcon(status: string): LucideIcon {
-  switch (status) {
-    case "active":
-      return Users;
-    default:
-      return UserPlus;
   }
 }

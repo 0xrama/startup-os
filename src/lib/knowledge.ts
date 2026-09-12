@@ -1,17 +1,6 @@
-import { embed } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./db";
-import { createLogger } from "./logger";
 import { documents, knowledgeChunks } from "./schema";
-import {
-  deleteKnowledgeVectors,
-  isVectorizeEnabled,
-  queryKnowledgeVectors,
-  upsertKnowledgeVectors,
-} from "./vectorize";
-
-const logger = createLogger("knowledge");
 
 export type Citation = {
   label: string;
@@ -44,8 +33,6 @@ export type KnowledgeSearchResult = {
   score: number;
 };
 
-const embeddingModel = openai.embedding("text-embedding-3-small");
-
 export function chunkText(content: string, size = 1200) {
   const normalized = content.replace(/\s+/g, " ").trim();
 
@@ -60,78 +47,12 @@ export function chunkText(content: string, size = 1200) {
   return chunks;
 }
 
-export async function embedText(content: string) {
-  const { embedding } = await embed({
-    model: embeddingModel,
-    value: content,
-  });
-
-  return embedding;
-}
-
 function toChunkId(sourceId: string | undefined, index: number) {
   if (!sourceId) {
     return crypto.randomUUID();
   }
 
   return `${sourceId}:${index + 1}`;
-}
-
-function getKnowledgeNamespace(metadata: KnowledgeChunkMetadata) {
-  return metadata.llcId ? `llc:${metadata.llcId}` : "official";
-}
-
-async function upsertKnowledgeChunksToVectorize({
-  values,
-}: {
-  values: Array<{
-    id: string;
-    source: string;
-    content: string;
-    embedding: number[];
-    metadata: KnowledgeChunkMetadata;
-  }>;
-}) {
-  if (!isVectorizeEnabled() || values.length === 0) {
-    return;
-  }
-
-  await upsertKnowledgeVectors(
-    values.map((value) => ({
-      id: value.id,
-      values: value.embedding,
-      namespace: getKnowledgeNamespace(value.metadata),
-      metadata: {
-        source: value.source,
-        content: value.content,
-        ...value.metadata,
-      },
-    }))
-  );
-}
-
-function similarity(a: number[], b: number[]) {
-  if (a.length !== b.length || a.length === 0) {
-    return 0;
-  }
-
-  let dot = 0;
-  let magA = 0;
-  let magB = 0;
-
-  for (let index = 0; index < a.length; index += 1) {
-    const av = a[index];
-    const bv = b[index];
-    dot += av * bv;
-    magA += av * av;
-    magB += bv * bv;
-  }
-
-  if (magA === 0 || magB === 0) {
-    return 0;
-  }
-
-  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
 export async function storeKnowledgeChunks({
@@ -147,148 +68,31 @@ export async function storeKnowledgeChunks({
 }) {
   if (chunks.length === 0) return;
 
-  const values = await Promise.all(
-    chunks.map(async (content, index) => {
-      const chunkMetadata: KnowledgeChunkMetadata = {
-        ...metadata,
-        section:
-          metadata.section !== undefined
-            ? `${metadata.section} · chunk ${index + 1}`
-            : `chunk ${index + 1}`,
-      };
+  const values = chunks.map((content, index) => {
+    const chunkMetadata: KnowledgeChunkMetadata = {
+      ...metadata,
+      section:
+        metadata.section !== undefined
+          ? `${metadata.section} · chunk ${index + 1}`
+          : `chunk ${index + 1}`,
+    };
 
-      return {
-        id: toChunkId(sourceId, index),
-        source,
-        sourceId: sourceId ?? null,
-        content,
-        embedding: await embedText(content),
-        metadata: chunkMetadata,
-      };
-    })
-  );
-
-  try {
-    await upsertKnowledgeChunksToVectorize({
-      values: values.map((value) => ({
-        id: value.id,
-        source: value.source,
-        content: value.content,
-        embedding: value.embedding,
-        metadata: value.metadata,
-      })),
-    });
-  } catch (error) {
-    logger.error("Vectorize upsert failed", {
+    return {
+      id: toChunkId(sourceId, index),
+      source,
       sourceId: sourceId ?? null,
-      error: error instanceof Error ? error : String(error),
-    });
-  }
+      content,
+      metadata: chunkMetadata,
+    };
+  });
 
   await db.insert(knowledgeChunks).values(values).onConflictDoNothing();
 }
 
-export async function syncKnowledgeChunksToVectorize(args: {
-  source: string;
-  sourceId?: string;
-  chunks: string[];
-  metadata: KnowledgeChunkMetadata;
-}) {
-  try {
-    const values = await Promise.all(
-      args.chunks.map(async (content, index) => {
-        const metadata: KnowledgeChunkMetadata = {
-          ...args.metadata,
-          section:
-            args.metadata.section !== undefined
-              ? `${args.metadata.section} · chunk ${index + 1}`
-              : `chunk ${index + 1}`,
-        };
-
-        return {
-          id: toChunkId(args.sourceId, index),
-          source: args.source,
-          content,
-          embedding: await embedText(content),
-          metadata,
-        };
-      })
-    );
-
-    await upsertKnowledgeChunksToVectorize({ values });
-  } catch (error) {
-    logger.error("Vectorize sync failed", {
-      sourceId: args.sourceId ?? null,
-      error: error instanceof Error ? error : String(error),
-    });
-  }
-}
-
 export async function deleteKnowledgeChunksBySource(sourceId: string) {
-  const rows = await db
-    .select({ id: knowledgeChunks.id })
-    .from(knowledgeChunks)
-    .where(eq(knowledgeChunks.sourceId, sourceId));
-
-  try {
-    await deleteKnowledgeVectors(rows.map((row) => row.id));
-  } catch (error) {
-    logger.error("Vectorize delete failed", {
-      sourceId,
-      error: error instanceof Error ? error : String(error),
-    });
-  }
-
   await db
     .delete(knowledgeChunks)
     .where(eq(knowledgeChunks.sourceId, sourceId));
-}
-
-async function searchKnowledgeBaseInD1({
-  query,
-  llcId,
-  limit,
-}: {
-  query: string;
-  llcId?: string;
-  limit: number;
-}) {
-  const embedding = await embedText(query);
-
-  const rows = await db
-    .select({
-      id: knowledgeChunks.id,
-      content: knowledgeChunks.content,
-      source: knowledgeChunks.source,
-      embedding: knowledgeChunks.embedding,
-      metadata: knowledgeChunks.metadata,
-    })
-    .from(knowledgeChunks)
-    .orderBy(desc(knowledgeChunks.createdAt));
-
-  const rowsWithScores = rows
-    .map((row) => ({
-      ...row,
-      score: similarity(row.embedding ?? [], embedding),
-    }))
-    .filter((row) => {
-      if (!llcId) {
-        return row.metadata?.llcId == null;
-      }
-
-      const metadata = row.metadata ?? {};
-
-      return metadata.llcId == null || metadata.llcId === llcId;
-    })
-    .sort((a, b) => b.score - a.score);
-
-  return rowsWithScores.slice(0, limit).map((row) => ({
-    id: row.id,
-    content: row.content,
-    source: row.source,
-    metadata: row.metadata ?? {},
-    score: row.score,
-  }));
 }
 
 export async function searchKnowledgeBase({
@@ -300,38 +104,41 @@ export async function searchKnowledgeBase({
   llcId?: string;
   limit?: number;
 }) {
-  if (isVectorizeEnabled()) {
-    try {
-      const embedding = await embedText(query);
+  const trimmed = query.trim();
 
-      const matches = await queryKnowledgeVectors({
-        embedding,
-        namespaces: llcId ? [`llc:${llcId}`, "official"] : ["official"],
-        limit,
-      });
+  if (!trimmed) return [];
 
-      if (matches) {
-        return matches.map((match) => ({
-          id: match.id,
-          content: match.metadata.content,
-          source: match.metadata.source,
-          metadata: match.metadata,
-          score: match.score,
-        }));
-      }
-    } catch (error) {
-      logger.error("Vectorize query failed", {
-        llcId: llcId ?? null,
-        error: error instanceof Error ? error : String(error),
-      });
-    }
-  }
+  const namespaceFilter = llcId
+    ? sql`(${knowledgeChunks.metadata}->>'llcId' IS NULL OR ${knowledgeChunks.metadata}->>'llcId' = ${llcId})`
+    : sql`${knowledgeChunks.metadata}->>'llcId' IS NULL`;
 
-  return searchKnowledgeBaseInD1({
-    query,
-    llcId,
-    limit,
-  });
+  const rank = sql`ts_rank(to_tsvector('english', ${knowledgeChunks.content}), websearch_to_tsquery('english', ${trimmed}))`;
+
+  const rows = await db
+    .select({
+      id: knowledgeChunks.id,
+      content: knowledgeChunks.content,
+      source: knowledgeChunks.source,
+      metadata: knowledgeChunks.metadata,
+      score: rank,
+    })
+    .from(knowledgeChunks)
+    .where(
+      and(
+        sql`to_tsvector('english', ${knowledgeChunks.content}) @@ websearch_to_tsquery('english', ${trimmed})`,
+        namespaceFilter
+      )
+    )
+    .orderBy(desc(rank))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    content: row.content,
+    source: row.source,
+    metadata: row.metadata ?? {},
+    score: Number(row.score),
+  }));
 }
 
 export async function getDocumentSearchResults(llcId: string, query: string) {

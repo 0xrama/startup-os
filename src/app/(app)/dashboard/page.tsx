@@ -1,10 +1,5 @@
 import { db } from "@/lib/db";
-import {
-  llcCollaborators,
-  llcs,
-  complianceTasks,
-  documents,
-} from "@/lib/schema";
+import { llcs, complianceTasks, documents } from "@/lib/schema";
 import { eq, and, lte, ne, inArray } from "drizzle-orm";
 import Link from "next/link";
 import {
@@ -18,38 +13,18 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VaultSetupCard } from "@/components/dashboard/vault-setup-card";
-import { requirePageSubscription } from "@/lib/access";
+import { requirePageSession } from "@/lib/access";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
 
 export default async function DashboardPage() {
-  const { session } = await requirePageSubscription();
+  const session = await requirePageSession();
 
   const userLlcs = await db
     .select()
     .from(llcs)
     .where(eq(llcs.userId, session.user.id));
 
-  const collaboratorRows = await db.query.llcCollaborators.findMany({
-    where: eq(llcCollaborators.userId, session.user.id),
-  });
-
-  const collaboratorLlcs =
-    collaboratorRows.length > 0
-      ? await db.query.llcs.findMany({
-          where: (fields, { inArray }) =>
-            inArray(
-              fields.id,
-              collaboratorRows.map((row) => row.llcId)
-            ),
-        })
-      : [];
-
-  const visibleLlcs = [...userLlcs, ...collaboratorLlcs].filter(
-    (llc, index, list) =>
-      list.findIndex((entry) => entry.id === llc.id) === index
-  );
-
-  const llcIds = visibleLlcs.map((l) => l.id);
+  const llcIds = userLlcs.map((l) => l.id);
   let upcomingTasks: (typeof complianceTasks.$inferSelect)[] = [];
   let docCount = 0;
 
@@ -131,9 +106,9 @@ export default async function DashboardPage() {
             </p>
             <Building2 className="h-5 w-5 text-muted-foreground/30" />
           </div>
-          <p className="mt-2 heading-serif text-5xl">{visibleLlcs.length}</p>
+          <p className="mt-2 heading-serif text-5xl">{userLlcs.length}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {visibleLlcs.length === 0 ? "No entities yet" : "Active"}
+            {userLlcs.length === 0 ? "No entities yet" : "Active"}
           </p>
         </StaggerItem>
         <StaggerItem className="bg-background p-6 sm:p-8">
@@ -166,7 +141,7 @@ export default async function DashboardPage() {
       </StaggerContainer>
 
       {/* Entities */}
-      {visibleLlcs.length === 0 ? (
+      {userLlcs.length === 0 ? (
         <div className="border border-dashed border-border p-12 text-center">
           <Building2
             className="mx-auto h-8 w-8 text-muted-foreground/40"
@@ -197,11 +172,11 @@ export default async function DashboardPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold">Entities</h2>
               <span className="text-[11px] text-muted-foreground">
-                {visibleLlcs.length} total
+                {userLlcs.length} total
               </span>
             </div>
             <StaggerContainer className="flex flex-col">
-              {visibleLlcs.map((llc) => {
+              {userLlcs.map((llc) => {
                 const pendingCount = pendingCountByLlc.get(llc.id) ?? 0;
                 const nextDeadline = nextDeadlineByLlc.get(llc.id) ?? null;
 

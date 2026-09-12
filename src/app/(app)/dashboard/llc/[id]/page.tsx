@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { llcCollaborators, complianceTasks, documents } from "@/lib/schema";
+import { complianceTasks, documents } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import {
@@ -14,7 +14,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LlcSecureDetails } from "@/components/dashboard/llc-secure-details";
 import { requirePageLlcAccess } from "@/lib/access";
-import { CollaboratorsPanel } from "@/components/dashboard/collaborators-panel";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
 
 export default async function LLCOverviewPage({
@@ -23,7 +22,7 @@ export default async function LLCOverviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { access, plan } = await requirePageLlcAccess(id);
+  const { access } = await requirePageLlcAccess(id);
   const llc = access.llc;
 
   const tasks = await db
@@ -32,10 +31,6 @@ export default async function LLCOverviewPage({
     .where(eq(complianceTasks.llcId, id));
 
   const docs = await db.select().from(documents).where(eq(documents.llcId, id));
-
-  const collaborators = await db.query.llcCollaborators.findMany({
-    where: eq(llcCollaborators.llcId, id),
-  });
 
   const pendingTasks = tasks.filter((t) => t.status !== "completed");
 
@@ -208,13 +203,6 @@ export default async function LLCOverviewPage({
           </div>
         </div>
       </FadeIn>
-
-      <CollaboratorsPanel
-        llcId={id}
-        collaborators={collaborators}
-        canManage={access.role === "owner"}
-        collaboratorsEnabled={plan === "pro"}
-      />
     </div>
   );
 }

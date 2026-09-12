@@ -1,8 +1,7 @@
-import { openai } from "@ai-sdk/openai";
 import { FORM_1065_AGENT_INSTRUCTIONS } from "./form-1065-agent-instructions";
 import { FORM_1120_AGENT_INSTRUCTIONS } from "./form-1120-agent-instructions";
 
-export const model = openai("gpt-4o");
+export { getChatModel } from "./ai-config";
 
 export const SYSTEM_PROMPT = `You are Pax Navigator, an AI assistant for non-resident U.S. LLC owners. You help users understand compliance obligations, filing deadlines, required forms, and next actions.
 

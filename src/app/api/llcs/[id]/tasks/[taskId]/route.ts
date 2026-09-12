@@ -72,9 +72,7 @@ export async function PATCH(
   const body = parsed.data;
 
   // Verify LLC ownership
-  const llc = await requireApiLlcAccess(session.user.id, id, {
-    editable: true,
-  });
+  const llc = await requireApiLlcAccess(session.user.id, id);
 
   if ("response" in llc) return llc.response;
 

@@ -23,9 +23,7 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const access = await requireApiLlcAccess(session.user.id, notice.llcId, {
-      editable: true,
-    });
+    const access = await requireApiLlcAccess(session.user.id, notice.llcId);
 
     if ("response" in access) return access.response;
 

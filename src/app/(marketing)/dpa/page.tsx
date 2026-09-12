@@ -26,7 +26,9 @@ export default function DPAPage() {
       </nav>
 
       <article className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="heading-serif text-4xl mb-2">Data Processing Agreement</h1>
+        <h1 className="heading-serif text-4xl mb-2">
+          Data Processing Agreement
+        </h1>
         <p className="text-sm text-muted-foreground mb-12">
           Last Updated: March 11, 2026
         </p>
@@ -36,14 +38,20 @@ export default function DPAPage() {
           <section>
             <h2 className="heading-serif text-xl mb-3">1. Introduction</h2>
             <p className="mb-3">
-              This Data Processing Agreement (&ldquo;DPA&rdquo;) forms an integral part of the{" "}
+              This Data Processing Agreement (&ldquo;DPA&rdquo;) forms an
+              integral part of the{" "}
               <Link href="/terms" className="text-primary hover:underline">
                 Terms of Service
               </Link>{" "}
-              between you (the &ldquo;Customer&rdquo; or &ldquo;Data Controller&rdquo;) and Integrofy LLC (&ldquo;Integrofy&rdquo;, &ldquo;we&rdquo;, or &ldquo;Data Processor&rdquo;), collectively referred to as the &ldquo;Parties&rdquo;.
+              for Pax, a product of Integrofy LLC (&ldquo;Integrofy&rdquo;).
             </p>
             <p>
-              This DPA sets out the terms that apply when Integrofy processes personal data on behalf of Customer in connection with the Pax Services. By using the Services, Customer enters into this DPA on behalf of itself.
+              Pax is self-hosted software. The person or organization that
+              deploys an instance (the &ldquo;Operator&rdquo;) runs it on
+              infrastructure they control and chooses. Integrofy does not host
+              an instance and does not process the personal data stored in it.
+              This DPA therefore describes the responsibilities of the Operator
+              and the third-party integrations the Operator may enable.
             </p>
           </section>
 
@@ -52,31 +60,51 @@ export default function DPAPage() {
             <h2 className="heading-serif text-xl mb-3">2. Definitions</h2>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground mb-4">
               <li>
-                <strong className="text-foreground">Applicable Data Protection Law</strong> means all laws and regulations applicable to Integrofy&apos;s processing of Personal Data under the Agreement, including the GDPR, the CCPA, and the UK GDPR.
+                <strong className="text-foreground">
+                  Applicable Data Protection Law
+                </strong>{" "}
+                means all laws and regulations applicable to the processing of
+                Personal Data under the Agreement, including the GDPR, the CCPA,
+                and the UK GDPR.
               </li>
               <li>
-                <strong className="text-foreground">CCPA</strong> means the California Consumer Privacy Act of 2018, as amended.
+                <strong className="text-foreground">CCPA</strong> means the
+                California Consumer Privacy Act of 2018, as amended.
               </li>
               <li>
-                <strong className="text-foreground">GDPR</strong> means the General Data Protection Regulation (Regulation (EU) 2016/679).
+                <strong className="text-foreground">GDPR</strong> means the
+                General Data Protection Regulation (Regulation (EU) 2016/679).
               </li>
               <li>
-                <strong className="text-foreground">Personal Data</strong> means any information relating to an identified or identifiable natural person that Integrofy processes on behalf of Customer.
+                <strong className="text-foreground">Personal Data</strong> means
+                any information relating to an identified or identifiable
+                natural person stored in a Pax instance.
               </li>
             </ul>
           </section>
 
           {/* 3 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">3. Roles and Responsibilities</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              3. Roles and Responsibilities
+            </h2>
             <p className="mb-3">
-              <strong>3.1 Relationship of the Parties.</strong> For the purposes of Applicable Data Protection Law, Customer is the Data Controller (or a Processor acting on behalf of another Controller) and Integrofy is the Data Processor processing Personal Data on behalf of Customer.
+              <strong>3.1 Relationship of the Parties.</strong> For the purposes
+              of Applicable Data Protection Law, the Operator is the Data
+              Controller of the Personal Data stored in their instance.
+              Integrofy is not a Data Processor of that data.
             </p>
             <p className="mb-3">
-              <strong>3.2 Purpose Limitation.</strong> Integrofy will process Personal Data only as necessary to provide the Services, in accordance with the Terms of Service and Customer&apos;s documented written instructions.
+              <strong>3.2 Operator Responsibility.</strong> The Operator is
+              responsible for running the instance, securing its database and
+              storage, configuring which integrations are enabled, and honoring
+              data subject requests.
             </p>
             <p>
-              <strong>3.3 Customer Compliance.</strong> Customer represents and warrants that it has all necessary rights, consents, and legal bases to provide the Personal Data to Integrofy for processing.
+              <strong>3.3 Operator Compliance.</strong> The Operator represents
+              and warrants that it has all necessary rights, consents, and legal
+              bases to store and process the Personal Data it places in the
+              instance.
             </p>
           </section>
 
@@ -84,29 +112,47 @@ export default function DPAPage() {
           <section>
             <h2 className="heading-serif text-xl mb-3">4. Sub-processing</h2>
             <p className="mb-3">
-              Customer grants Integrofy a general authorization to engage Sub-processors (including OpenAI, Cloudflare, Resend, Meta, and Polar) to process Personal Data. 
+              Sub-processors are chosen and engaged by the Operator, not by
+              Integrofy. Typical integrations an Operator may enable include an
+              OpenAI-compatible AI provider, an S3-compatible storage provider,
+              Resend for email reminders, and Meta (WhatsApp) for WhatsApp
+              reminders.
             </p>
             <p>
-              Integrofy will impose data protection obligations on its Sub-processors that are at least as protective as those set out in this DPA and remains liable for their acts and omissions as they relate to processing Personal Data.
+              The Operator is responsible for reviewing and imposing appropriate
+              data protection obligations on any integration they enable.
             </p>
           </section>
 
           {/* 5 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">5. Data Subject Rights</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              5. Data Subject Rights
+            </h2>
             <p>
-              Taking into account the nature of the processing, Integrofy will assist Customer by implementing appropriate technical and organizational measures, insofar as this is possible, to enable Customer to fulfill its obligation to respond to requests for exercising Data Subject rights under Applicable Data Protection Law.
+              The Operator is responsible for responding to requests to exercise
+              data subject rights. The software provides the Operator with the
+              tools to view, export, and delete the data in an instance.
             </p>
           </section>
 
           {/* 6 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">6. Security and Personal Data Breach Notification</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              6. Security and Breach Notification
+            </h2>
             <p className="mb-3">
-              <strong>6.1 Security Measures.</strong> Integrofy implements and maintains appropriate technical and organizational security measures to protect Personal Data against unauthorized or unlawful processing and against accidental or unlawful destruction, loss, alteration, or damage, including but not limited to AES-256 encryption at rest for documents stored in the Document Vault.
+              <strong>6.1 Security Measures.</strong> The software encrypts
+              vault documents client-side with AES-256 before storage and serves
+              them through time-limited presigned URLs. The Operator is
+              responsible for the security of the hosting, database, and storage
+              it configures.
             </p>
             <p>
-              <strong>6.2 Breach Notification.</strong> Integrofy will notify Customer without undue delay (and in any event within 72 hours) upon becoming aware of a verified Personal Data Breach affecting Customer&apos;s Personal Data.
+              <strong>6.2 Breach Notification.</strong> Because Integrofy does
+              not process instance data, the Operator is responsible for
+              notifying affected data subjects and authorities of any breach in
+              accordance with Applicable Data Protection Law.
             </p>
           </section>
 
@@ -114,15 +160,25 @@ export default function DPAPage() {
           <section>
             <h2 className="heading-serif text-xl mb-3">7. Data Transfers</h2>
             <p>
-              Integrofy may process Personal Data globally, including in the United States. If Customer is transferring Personal Data out of the European Economic Area (EEA), the United Kingdom, or Switzerland, the Parties agree that the applicable Standard Contractual Clauses (SCCs) are incorporated by reference into this DPA and apply to the transfer.
+              Data location and any cross-border transfers depend on the
+              infrastructure and integrations the Operator chooses. The Operator
+              is responsible for putting appropriate transfer mechanisms in
+              place (for example, Standard Contractual Clauses with a chosen
+              provider).
             </p>
           </section>
 
           {/* 8 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">8. Return or Deletion of Data</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              8. Return or Deletion of Data
+            </h2>
             <p>
-              Upon termination or expiration of the Agreement, Integrofy will, at the choice of Customer, delete or return all Personal Data to Customer, except to the extent that Applicable Data Protection Law requires storage of the Personal Data.
+              The Operator controls deletion, since all data lives in the
+              Operator&apos;s own database and storage. Deleting the account
+              from the Account page removes the account and its associated data,
+              and the Operator can also remove the underlying database and
+              bucket.
             </p>
           </section>
 
@@ -158,9 +214,24 @@ export default function DPAPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <span className="heading-serif text-base">Pax</span>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            <Link href="/dpa" className="hover:text-foreground transition-colors">DPA</Link>
+            <Link
+              href="/terms"
+              className="hover:text-foreground transition-colors"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="hover:text-foreground transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/dpa"
+              className="hover:text-foreground transition-colors"
+            >
+              DPA
+            </Link>
             <span>© {new Date().getFullYear()} Integrofy LLC</span>
           </div>
         </div>

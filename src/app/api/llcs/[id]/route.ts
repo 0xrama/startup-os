@@ -40,9 +40,7 @@ export async function PATCH(
 
   const hasEncryption = !!encryption;
 
-  const access = await requireApiLlcAccess(session.user.id, id, {
-    editable: true,
-  });
+  const access = await requireApiLlcAccess(session.user.id, id);
 
   if ("response" in access) return access.response;
   const llc = access.access.llc;

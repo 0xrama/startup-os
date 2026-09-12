@@ -6,7 +6,7 @@ import { eq, ne } from "drizzle-orm";
 import { scheduleTaskReminders } from "@/lib/reminders";
 import { isTaskVisible } from "@/lib/compliance-task-details";
 
-export async function POST(request: NextRequest) {
+async function run(request: NextRequest) {
   if (!authorizeInternalRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -45,4 +45,12 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ count: scheduled.length });
+}
+
+export async function GET(request: NextRequest) {
+  return run(request);
+}
+
+export async function POST(request: NextRequest) {
+  return run(request);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble } from "./message-bubble";
 import type { Message } from "./types";
@@ -8,16 +9,22 @@ type MessageListProps = {
   messages: Message[];
   isLoading: boolean;
   loadingMessages: boolean;
-  viewportRef: React.RefObject<HTMLDivElement | null>;
 };
 
 export function MessageList({
   messages,
   isLoading,
   loadingMessages,
-  viewportRef,
 }: MessageListProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+
+    if (!viewport) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [messages, isLoading]);
 
   return (
     <div ref={viewportRef} className="min-h-0 flex-1 overflow-y-auto">

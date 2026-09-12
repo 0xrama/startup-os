@@ -1,5 +1,4 @@
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 import { z } from "zod";
@@ -7,11 +6,11 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { getObjectBytes } from "./r2";
 import { documents, knowledgeChunks, noticeCases } from "./schema";
+import { getChatModel } from "./ai-config";
 import {
   chunkText,
   deleteKnowledgeChunksBySource,
   storeKnowledgeChunks,
-  syncKnowledgeChunksToVectorize,
 } from "./knowledge";
 
 declare global {
@@ -99,7 +98,7 @@ async function extractTextFromDocument(
     const base64 = bytes.toString("base64");
 
     const result = await generateObject({
-      model: openai("gpt-4o-mini"),
+      model: await getChatModel(),
       schema: z.object({
         text: z.string().default(""),
       }),
@@ -132,7 +131,7 @@ async function classifyExtractedText(text: string) {
   }
 
   const result = await generateObject({
-    model: openai("gpt-4o-mini"),
+    model: await getChatModel(),
     schema: extractionSchema,
     prompt: `Analyze this LLC compliance document. Return structured metadata. If it is a notice, infer risk level and a proposed task title and description.
 
@@ -293,10 +292,7 @@ export async function seedOfficialKnowledge() {
 
     if (!existing) {
       await storeKnowledgeChunks(item);
-      continue;
     }
-
-    await syncKnowledgeChunksToVectorize(item);
   }
 
   globalThis.__OFFICIAL_KNOWLEDGE_SYNCED__ = true;

@@ -367,6 +367,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptMode, setPromptMode] = useState<"setup" | "unlock" | null>(null);
+
   const [pendingRecoveryCode, setPendingRecoveryCode] = useState<string | null>(
     null
   );
@@ -379,6 +380,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         getStatus(),
         restoreMasterKey(),
       ]);
+
       setStatus(encryptionStatus);
       setMasterKey(restoredMasterKey);
       setError(null);
@@ -458,6 +460,7 @@ export function EncryptionProvider({ children }: { children: ReactNode }) {
         status.pinWrappedMasterKey,
         pin
       );
+
       await persistMasterKey(unlockedKey);
       setMasterKey(unlockedKey);
       setPromptMode(null);

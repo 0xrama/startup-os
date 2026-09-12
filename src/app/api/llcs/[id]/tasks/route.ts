@@ -41,9 +41,7 @@ export async function POST(
   const { id } = await params;
   const body = await request.json();
 
-  const llc = await requireApiLlcAccess(session.user.id, id, {
-    editable: true,
-  });
+  const llc = await requireApiLlcAccess(session.user.id, id);
 
   if ("response" in llc) return llc.response;
 

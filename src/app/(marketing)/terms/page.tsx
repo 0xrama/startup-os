@@ -36,22 +36,21 @@ export default function TermsPage() {
           <section>
             <h2 className="heading-serif text-xl mb-3">1. Introduction</h2>
             <p className="mb-3">
-              Welcome to Pax! Your use of our services, including the
-              services we make available through this website and all related
-              websites, mobile sites, data files, visualizations, and
-              applications which link to these terms of service (the
-              &ldquo;Site&rdquo;) and to all software or services offered by us
-              in connection with any of those (collectively, the
-              &ldquo;Services&rdquo;), is governed by these terms of service
-              (the &ldquo;Terms&rdquo;), so please carefully read them before
-              using the Services.
+              Welcome to Pax! Your use of our services, including the services
+              we make available through this website and all related websites,
+              mobile sites, data files, visualizations, and applications which
+              link to these terms of service (the &ldquo;Site&rdquo;) and to all
+              software or services offered by us in connection with any of those
+              (collectively, the &ldquo;Services&rdquo;), is governed by these
+              terms of service (the &ldquo;Terms&rdquo;), so please carefully
+              read them before using the Services.
             </p>
             <p className="mb-3">
               For the purposes of these Terms, &ldquo;we,&rdquo;
               &ldquo;our,&rdquo; &ldquo;us,&rdquo; and &ldquo;Integrofy&rdquo;
               refer to Integrofy LLC, the providers and operators of the
-              Services. &ldquo;Pax&rdquo; is a product and brand of
-              Integrofy LLC.
+              Services. &ldquo;Pax&rdquo; is a product and brand of Integrofy
+              LLC.
             </p>
             <p className="mb-3">
               In order to use the Services, you must first agree to these Terms.
@@ -92,10 +91,11 @@ export default function TermsPage() {
             </p>
             <p>
               You are responsible for ensuring that your access credentials are
-              kept confidential and are not disclosed to any third party, and for
-              all activity that occurs under your Customer Account. You agree to
-              notify us immediately upon learning of any unauthorized access to
-              your Customer Account or any other suspected security breach.
+              kept confidential and are not disclosed to any third party, and
+              for all activity that occurs under your Customer Account. You
+              agree to notify us immediately upon learning of any unauthorized
+              access to your Customer Account or any other suspected security
+              breach.
             </p>
           </section>
 
@@ -103,8 +103,8 @@ export default function TermsPage() {
           <section>
             <h2 className="heading-serif text-xl mb-3">3. Content</h2>
             <p className="mb-3">
-              You will be able to upload, create, host, transmit, share,
-              publish or display information (such as data files, written text,
+              You will be able to upload, create, host, transmit, share, publish
+              or display information (such as data files, written text,
               photographs, or other materials) through use of the Services. All
               such information is referred to below as &ldquo;User
               Content.&rdquo; This includes documents uploaded to the Pax
@@ -113,13 +113,12 @@ export default function TermsPage() {
             </p>
             <p className="mb-3">
               You are solely responsible for the development, content, and use
-              of the User Content you upload to Pax and you assume all
-              risks associated with them, including intellectual property or
-              other legal claims. By storing User Content with Pax, you
-              represent that you have all necessary rights to store, use and, if
-              applicable, publicize that User Content, and that doing so does
-              not conflict with, violate or misappropriate any third party legal
-              rights.
+              of the User Content you upload to Pax and you assume all risks
+              associated with them, including intellectual property or other
+              legal claims. By storing User Content with Pax, you represent that
+              you have all necessary rights to store, use and, if applicable,
+              publicize that User Content, and that doing so does not conflict
+              with, violate or misappropriate any third party legal rights.
             </p>
             <p className="mb-3">
               You agree to immediately take down any User Content that violates
@@ -131,10 +130,17 @@ export default function TermsPage() {
               of our Terms, or any applicable law and/or regulations.
             </p>
             <p>
-              <strong>AI-Generated Outputs:</strong> When you use the Pax Assistant, 
-              the Services may generate and return responses based on your queries and User Content (&ldquo;Output&rdquo;). 
-              As between you and Integrofy, subject to your compliance with these Terms, Integrofy assigns to you all its right, title, and interest in and to the Output. This means you can use the Output for any purpose, 
-              provided that you do not use it to violate these Terms, our policies, or any applicable law. Due to the nature of machine learning, Output may not be unique across users, and you acknowledge that other users may receive similar or identical Output.
+              <strong>AI-Generated Outputs:</strong> When you use the Pax
+              Assistant, the Services may generate and return responses based on
+              your queries and User Content (&ldquo;Output&rdquo;). As between
+              you and Integrofy, subject to your compliance with these Terms,
+              Integrofy assigns to you all its right, title, and interest in and
+              to the Output. This means you can use the Output for any purpose,
+              provided that you do not use it to violate these Terms, our
+              policies, or any applicable law. Due to the nature of machine
+              learning, Output may not be unique across users, and you
+              acknowledge that other users may receive similar or identical
+              Output.
             </p>
           </section>
 
@@ -235,22 +241,27 @@ export default function TermsPage() {
                 defamatory, or otherwise objectionable content;
               </li>
               <li>Is harmful to minors;</li>
-              <li>
-                Contains malware, viruses, or any other harmful software;
-              </li>
+              <li>Contains malware, viruses, or any other harmful software;</li>
               <li>Violates any law, statute, ordinance, or regulation.</li>
             </ul>
           </section>
 
           {/* 6 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">6. Pricing Terms</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              6. Self-Hosted Software
+            </h2>
+            <p className="mb-3">
+              Pax is self-hosted, single-user software. The person or
+              organization that deploys an instance (the &ldquo;Operator&rdquo;)
+              is responsible for running it, configuring its database, storage,
+              and integrations, and for all data stored in it. Integrofy does
+              not host the instance or receive the data in it.
+            </p>
             <p>
-              Subject to the Terms, certain Services may be provided to you
-              without charge up to certain usage limits, and usage in excess of
-              these limits may require purchase of additional resources and the
-              payment of fees. Please see the relevant product pricing page for
-              more details regarding pricing for the Services.
+              Integrofy does not charge you for using a self-hosted instance.
+              Any costs are those the Operator pays directly to their hosting,
+              database, storage, email, or AI providers.
             </p>
           </section>
 
@@ -260,8 +271,8 @@ export default function TermsPage() {
               7. Informational Guidance Disclaimer
             </h2>
             <p className="mb-3">
-              The Services, including the Pax Assistant (AI chatbot),
-              compliance calendar, and filing guidance, provide{" "}
+              The Services, including the Pax Assistant (AI chatbot), compliance
+              calendar, and filing guidance, provide{" "}
               <strong>informational guidance only</strong>. Nothing provided
               through the Services constitutes legal, tax, or accounting advice.
             </p>
@@ -276,13 +287,12 @@ export default function TermsPage() {
 
           {/* 8 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">8. Privacy & Data Processing</h2>
+            <h2 className="heading-serif text-xl mb-3">
+              8. Privacy & Data Processing
+            </h2>
             <p className="mb-3">
               These Services are provided in accordance with our{" "}
-              <Link
-                href="/privacy"
-                className="text-primary hover:underline"
-              >
+              <Link href="/privacy" className="text-primary hover:underline">
                 Privacy Policy
               </Link>
               . You agree to the use of your User Content and personal
@@ -290,14 +300,14 @@ export default function TermsPage() {
               Privacy Policy.
             </p>
             <p>
-              To the extent we process any personal data on your behalf subject to applicable data protection laws (such as the GDPR or CCPA), the current version of our{" "}
-              <Link
-                href="/dpa"
-                className="text-primary hover:underline"
-              >
+              To the extent we process any personal data on your behalf subject
+              to applicable data protection laws (such as the GDPR or CCPA), the
+              current version of our{" "}
+              <Link href="/dpa" className="text-primary hover:underline">
                 Data Processing Agreement (DPA)
-              </Link>
-              {" "}is incorporated herein by reference and forms a part of these Terms.
+              </Link>{" "}
+              is incorporated herein by reference and forms a part of these
+              Terms.
             </p>
           </section>
 
@@ -313,9 +323,8 @@ export default function TermsPage() {
               change from time to time without prior notice to you.
             </p>
             <p className="mb-3">
-              You may terminate these Terms at any time by canceling your
-              account on the Services. You will not receive any refunds if you
-              cancel your account.
+              You may terminate these Terms at any time by deleting your account
+              from the Account page.
             </p>
             <p>
               You agree that Integrofy, in its sole discretion and for any or no
@@ -334,11 +343,12 @@ export default function TermsPage() {
             <p>
               These Terms may be amended or updated from time to time without
               notice and may have changed since your last visit to the website
-              or use of the Services. However, if we make any <strong>material changes</strong>, 
-              we will notify you by sending an email to the address associated with your Customer Account prior to the changes taking effect. 
-              By continuing to access or use the Services
-              after any revisions become effective, you agree to be bound by the
-              revised Terms.
+              or use of the Services. However, if we make any{" "}
+              <strong>material changes</strong>, we will notify you by sending
+              an email to the address associated with your Customer Account
+              prior to the changes taking effect. By continuing to access or use
+              the Services after any revisions become effective, you agree to be
+              bound by the revised Terms.
             </p>
           </section>
 
@@ -349,20 +359,20 @@ export default function TermsPage() {
             </h2>
             <p className="font-medium text-foreground mb-3">
               YOU EXPRESSLY UNDERSTAND AND AGREE THAT YOUR USE OF THE SERVICES
-              ARE AT YOUR SOLE RISK AND THAT THE SERVICES ARE PROVIDED
-              &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE.&rdquo;
+              ARE AT YOUR SOLE RISK AND THAT THE SERVICES ARE PROVIDED &ldquo;AS
+              IS&rdquo; AND &ldquo;AS AVAILABLE.&rdquo;
             </p>
             <p className="font-medium text-foreground">
-              INTEGROFY, ITS SUBSIDIARIES AND AFFILIATES, AND ITS LICENSORS
-              MAKE NO EXPRESS WARRANTIES AND DISCLAIM ALL IMPLIED WARRANTIES
+              INTEGROFY, ITS SUBSIDIARIES AND AFFILIATES, AND ITS LICENSORS MAKE
+              NO EXPRESS WARRANTIES AND DISCLAIM ALL IMPLIED WARRANTIES
               REGARDING THE SERVICES, INCLUDING IMPLIED WARRANTIES OF
               MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
               NON-INFRINGEMENT. WITHOUT LIMITING THE GENERALITY OF THE
               FOREGOING, INTEGROFY DOES NOT REPRESENT OR WARRANT TO YOU THAT:
-              (A) YOUR USE OF THE SERVICES WILL MEET YOUR REQUIREMENTS, (B)
-              YOUR USE OF THE SERVICES WILL BE UNINTERRUPTED, TIMELY, SECURE
-              OR FREE FROM ERROR, AND (C) USAGE DATA PROVIDED THROUGH THE
-              SERVICES WILL BE ACCURATE.
+              (A) YOUR USE OF THE SERVICES WILL MEET YOUR REQUIREMENTS, (B) YOUR
+              USE OF THE SERVICES WILL BE UNINTERRUPTED, TIMELY, SECURE OR FREE
+              FROM ERROR, AND (C) USAGE DATA PROVIDED THROUGH THE SERVICES WILL
+              BE ACCURATE.
             </p>
           </section>
 
@@ -373,20 +383,19 @@ export default function TermsPage() {
             </h2>
             <p className="font-medium text-foreground mb-3">
               YOU EXPRESSLY UNDERSTAND AND AGREE THAT INTEGROFY, ITS
-              SUBSIDIARIES AND AFFILIATES, AND ITS LICENSORS SHALL NOT BE
-              LIABLE TO YOU FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
-              CONSEQUENTIAL, OR EXEMPLARY DAMAGES WHICH MAY BE INCURRED BY
-              YOU, HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY. THIS
-              SHALL INCLUDE, BUT NOT BE LIMITED TO, ANY LOSS OF PROFIT, ANY
-              LOSS OF GOODWILL OR BUSINESS REPUTATION, ANY LOSS OF DATA
-              SUFFERED, COST OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
-              OR OTHER INTANGIBLE LOSS.
+              SUBSIDIARIES AND AFFILIATES, AND ITS LICENSORS SHALL NOT BE LIABLE
+              TO YOU FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
+              EXEMPLARY DAMAGES WHICH MAY BE INCURRED BY YOU, HOWEVER CAUSED AND
+              UNDER ANY THEORY OF LIABILITY. THIS SHALL INCLUDE, BUT NOT BE
+              LIMITED TO, ANY LOSS OF PROFIT, ANY LOSS OF GOODWILL OR BUSINESS
+              REPUTATION, ANY LOSS OF DATA SUFFERED, COST OF PROCUREMENT OF
+              SUBSTITUTE GOODS OR SERVICES, OR OTHER INTANGIBLE LOSS.
             </p>
             <p className="font-medium text-foreground">
               IN NO EVENT SHALL INTEGROFY&apos;S TOTAL LIABILITY TO YOU FOR ALL
-              DAMAGES, LOSSES, AND CAUSES OF ACTION EXCEED THE AMOUNT THAT
-              YOU HAVE ACTUALLY PAID FOR THE SERVICES IN THE PAST TWELVE
-              MONTHS, OR ONE HUNDRED DOLLARS ($100.00), WHICHEVER IS GREATER.
+              DAMAGES, LOSSES, AND CAUSES OF ACTION EXCEED THE AMOUNT THAT YOU
+              HAVE ACTUALLY PAID FOR THE SERVICES IN THE PAST TWELVE MONTHS, OR
+              ONE HUNDRED DOLLARS ($100.00), WHICHEVER IS GREATER.
             </p>
           </section>
 
@@ -408,9 +417,7 @@ export default function TermsPage() {
 
           {/* 14 */}
           <section>
-            <h2 className="heading-serif text-xl mb-3">
-              14. Copyright Policy
-            </h2>
+            <h2 className="heading-serif text-xl mb-3">14. Copyright Policy</h2>
             <p className="mb-3">
               We respect the intellectual property rights of others and expect
               our users to do the same. In accordance with the Digital
@@ -466,9 +473,9 @@ export default function TermsPage() {
             <p>
               These Terms and any action related thereto will be governed by the
               laws of the State of Washington without regard to its conflict of
-              laws provisions. The exclusive jurisdiction and venue of any action
-              with respect to the subject matter of these Terms will be the
-              state and federal courts located in King County, Washington.
+              laws provisions. The exclusive jurisdiction and venue of any
+              action with respect to the subject matter of these Terms will be
+              the state and federal courts located in King County, Washington.
             </p>
           </section>
 
@@ -524,9 +531,24 @@ export default function TermsPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <span className="heading-serif text-base">Pax</span>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            <Link href="/dpa" className="hover:text-foreground transition-colors">DPA</Link>
+            <Link
+              href="/terms"
+              className="hover:text-foreground transition-colors"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="hover:text-foreground transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/dpa"
+              className="hover:text-foreground transition-colors"
+            >
+              DPA
+            </Link>
             <span>© {new Date().getFullYear()} Integrofy LLC</span>
           </div>
         </div>

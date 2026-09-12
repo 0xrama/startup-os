@@ -1,18 +1,30 @@
 name = "pax"
 compatibility_date = "2026-03-18"
 compatibility_flags = ["nodejs_compat"]
-main = "vinext/server/app-router-entry"
+# The deploy entry is our worker, not the bare vinext router: it adds the
+# `scheduled` handler for cron reminders (see worker/index.ts). Keep this
+# pointing at worker/index.ts — the vinext entry alone has no cron support.
+main = "worker/index.ts"
 
 [vars]
-# Replace these example URLs and the all-zero D1 ID before remote deployment.
+# Replace these example URLs before remote deployment.
 NEXT_PUBLIC_APP_URL = "https://startup-os.example.com"
 BETTER_AUTH_URL = "https://startup-os.example.com"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "startupos"
-database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "drizzle"
+# Reminder scheduling: the worker's `scheduled` handler calls the internal
+# reminder endpoints. `enqueue-due` builds the queue, `process` delivers it.
+[triggers]
+crons = ["0 * * * *", "*/15 * * * *"]
+
+
+# Hyperdrive gives Workers a pooled connection to Postgres (Neon, Supabase,
+# RDS, ...). Create one with `wrangler hyperdrive create pax-postgres
+# --connection-string="postgres://..."`, then set the id below. The binding
+# exposes the pooled connection string as HYPERDRIVE_CONNECTION_STRING.
+#
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<hyperdrive-id>"
 
 # Optional: enable this only after the bucket exists and you switch code to use
 # a native Workers R2 binding. The current app talks to R2 through S3-compatible
@@ -22,11 +34,3 @@ migrations_dir = "drizzle"
 # binding = "R2_BUCKET"
 # bucket_name = "pax"
 # preview_bucket_name = "pax-dev"
-
-# Optional: enable this after you create the Vectorize index named
-# "pax-knowledge". Until then, the app falls back to D1-backed retrieval.
-#
-# [[vectorize]]
-# binding = "VECTORIZE"
-# index_name = "pax-knowledge"
-# remote = true

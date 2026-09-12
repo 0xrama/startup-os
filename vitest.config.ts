@@ -13,7 +13,7 @@ export default defineConfig({
       enabled: true,
       include: [
         "src/app/api/health/route.ts",
-        "src/lib/plan-limits.ts",
+        "src/lib/internal-auth.ts",
         "src/lib/request-context.ts",
       ],
       provider: "v8",

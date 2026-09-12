@@ -13,13 +13,6 @@ import type {
   Message,
 } from "@/components/dashboard/assistant/types";
 
-type BillingStatus = {
-  limits?: {
-    maxAssistantQueries: number;
-  };
-  adminBypass?: boolean;
-};
-
 export default function AssistantPage() {
   const { id: llcId } = useParams<{ id: string }>();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -33,13 +26,7 @@ export default function AssistantPage() {
   const [messageError, setMessageError] = useState<string | null>(null);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
 
-  const [assistantCapLabel, setAssistantCapLabel] = useState<string | null>(
-    null
-  );
-
-  const [isAdminBypass, setIsAdminBypass] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const messagesViewportRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const normalizeMessages = useCallback(
@@ -59,30 +46,6 @@ export default function AssistantPage() {
       })),
     []
   );
-
-  const loadBillingStatus = useCallback(async () => {
-    try {
-      const response = await fetch("/api/billing/status", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) return;
-
-      // SAFETY: /api/billing/status is owned by this app and serializes the
-      // BillingStatus shape defined beside its route handler.
-      const data = (await response.json()) as BillingStatus;
-      setIsAdminBypass(data.adminBypass === true);
-      const cap = data.limits?.maxAssistantQueries;
-
-      if (Number.isFinite(cap)) {
-        setAssistantCapLabel(`${cap} questions/mo`);
-      } else {
-        setAssistantCapLabel("Unlimited");
-      }
-    } catch {
-      setAssistantCapLabel(null);
-    }
-  }, []);
 
   const selectConversation = useCallback(
     async (id: string) => {
@@ -171,23 +134,8 @@ export default function AssistantPage() {
   );
 
   useEffect(() => {
-    void Promise.all([loadConversations(), loadBillingStatus()]);
-  }, [loadBillingStatus, loadConversations]);
-
-  useEffect(() => {
-    const viewport = messagesViewportRef.current;
-
-    if (!viewport) return;
-    viewport.scrollTop = viewport.scrollHeight;
-  }, [messages, isLoading]);
-
-  useEffect(() => {
-    const textarea = composerRef.current;
-
-    if (!textarea) return;
-    textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
-  }, [input]);
+    void loadConversations();
+  }, [loadConversations]);
 
   function startNewConversation() {
     setConversationId(null);
@@ -307,88 +255,89 @@ export default function AssistantPage() {
     }
   }
 
-  function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void handleSend();
-    }
-  }
-
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] overflow-hidden">
-      {/* ─── Thread Sidebar ─────────────────────────────────────── */}
-      <ThreadSidebar
-        conversations={conversations}
-        conversationId={conversationId}
-        loadingThreads={loadingThreads}
-        threadError={threadError}
-        assistantCapLabel={assistantCapLabel}
-        isAdminBypass={isAdminBypass}
-        sidebarOpen={sidebarOpen}
-        onSelectConversation={(id) => void selectConversation(id)}
-        onNewConversation={startNewConversation}
-        onCloseSidebar={() => setSidebarOpen(false)}
-        onRetryThreads={() => void loadConversations()}
-      />
+    <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <div>
+          <p className="text-sm font-medium">AI Copilot</p>
+          <p className="text-[11px] text-muted-foreground">
+            Informational guidance and draft preparation, not professional tax
+            advice.
+          </p>
+        </div>
+      </div>
 
-      {/* ─── Main Chat Area ─────────────────────────────────────── */}
-      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-        {/* Sidebar toggle (when closed) */}
-        {!sidebarOpen ? (
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            title="Open sidebar"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
-        ) : null}
-
-        {/* Alerts */}
-        {gateMessage ? (
-          <div className="mx-auto w-full max-w-3xl px-6 pt-3">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-              {gateMessage}
-            </div>
-          </div>
-        ) : null}
-
-        {messageError ? (
-          <div className="mx-auto w-full max-w-3xl px-6 pt-3">
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-xs text-destructive">
-              {messageError}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Messages area or empty state */}
-        {!loadingMessages && !hasMessages ? (
-          <EmptyState
-            composerRef={composerRef}
-            onSelectPrompt={(prompt) => setInput(prompt)}
-          />
-        ) : (
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            loadingMessages={loadingMessages}
-            viewportRef={messagesViewportRef}
-          />
-        )}
-
-        {/* ─── Composer ─────────────────────────────────────────── */}
-        <Composer
-          input={input}
-          isLoading={isLoading}
-          composerRef={composerRef}
-          onChange={setInput}
-          onSend={() => void handleSend()}
-          onKeyDown={handleComposerKeyDown}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* ─── Thread Sidebar ─────────────────────────────────────── */}
+        <ThreadSidebar
+          conversations={conversations}
+          conversationId={conversationId}
+          loadingThreads={loadingThreads}
+          threadError={threadError}
+          sidebarOpen={sidebarOpen}
+          onSelectConversation={(id) => void selectConversation(id)}
+          onNewConversation={startNewConversation}
+          onCloseSidebar={() => setSidebarOpen(false)}
+          onRetryThreads={() => void loadConversations()}
         />
-      </section>
+
+        {/* ─── Main Chat Area ─────────────────────────────────────── */}
+        <section className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          {/* Sidebar toggle (when closed) */}
+          {!sidebarOpen ? (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              title="Open sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          ) : null}
+
+          {/* Alerts */}
+          {gateMessage ? (
+            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+                {gateMessage}
+              </div>
+            </div>
+          ) : null}
+
+          {messageError ? (
+            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-xs text-destructive">
+                {messageError}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Messages area or empty state */}
+          {!loadingMessages && !hasMessages ? (
+            <EmptyState
+              composerRef={composerRef}
+              onSelectPrompt={(prompt) => setInput(prompt)}
+            />
+          ) : (
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              loadingMessages={loadingMessages}
+            />
+          )}
+
+          {/* ─── Composer ─────────────────────────────────────────── */}
+          <Composer
+            input={input}
+            isLoading={isLoading}
+            composerRef={composerRef}
+            onChange={setInput}
+            onSend={() => void handleSend()}
+          />
+        </section>
+      </div>
     </div>
   );
 }

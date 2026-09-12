@@ -1,55 +1,24 @@
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-/** Opaque handle drizzle receives back from `prepare` calls on the binding. */
-type D1Statement = {
-  bind(...values: unknown[]): D1Statement;
-};
+function getConnectionString() {
+  const connectionString =
+    process.env.HYPERDRIVE_CONNECTION_STRING ?? process.env.DATABASE_URL;
 
-type D1CompatibleDb = {
-  prepare(query: string): D1Statement;
-};
-
-declare global {
-  var __D1_DB__: D1CompatibleDb | undefined;
-}
-
-type D1RuntimeGlobals = {
-  __D1_DB__?: D1CompatibleDb;
-  __env__?: {
-    DB?: D1CompatibleDb;
-  };
-  DB?: D1CompatibleDb;
-  env?: {
-    DB?: D1CompatibleDb;
-  };
-};
-
-function getD1Database() {
-  // SAFETY: globalThis only carries the extra DB shims in local and test
-  // runtimes; every lookup is optional-chained so absent bindings resolve to
-  // the "missing binding" error below instead of a crash.
-  const globals = globalThis as D1RuntimeGlobals;
-
-  const d1 =
-    globals.__D1_DB__ ??
-    env.DB ??
-    globals.__env__?.DB ??
-    globals.DB ??
-    globals.env?.DB;
-
-  if (!d1) {
+  if (!connectionString) {
     throw new Error(
-      "D1 database binding missing. Set globalThis.__D1_DB__ (local shim) or provide DB on the Cloudflare runtime env."
+      "Database connection string missing. Set DATABASE_URL, or HYPERDRIVE_CONNECTION_STRING when running on Cloudflare Workers."
     );
   }
 
-  return d1;
+  return connectionString;
 }
 
 function createDb() {
-  return drizzle(getD1Database(), { schema });
+  const pool = new Pool({ connectionString: getConnectionString() });
+
+  return drizzle(pool, { schema });
 }
 
 type DbInstance = ReturnType<typeof createDb>;

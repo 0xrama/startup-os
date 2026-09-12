@@ -10,6 +10,15 @@
 - Call `/api/metrics`
 - If `INTERNAL_CRON_SECRET` is set, include `x-internal-secret`
 
+## Reminder scheduling
+
+- `GET`/`POST /api/internal/reminders/enqueue-due` builds the reminder queue.
+- `GET`/`POST /api/internal/reminders/process` delivers due reminders.
+- Authenticate with `x-internal-secret`, `Authorization: Bearer <secret>`, or
+  `?secret=<secret>`.
+- Vercel Cron calls these via `vercel.json`; Cloudflare calls them from the
+  worker's `scheduled` handler.
+
 ## Debugging
 
 - Correlate API failures by `x-request-id`
@@ -18,9 +27,12 @@
 
 ## Common failures
 
-- `D1 database binding missing`
-  - The runtime did not receive `DB`/`__D1_DB__`
-- `Unauthorized` from `/api/metrics`
-  - The scrape secret header is missing or wrong
-- empty assistant citations
-  - `FEATURE_ASSISTANT_RETRIEVAL` is off or Vectorize/embedding setup is unavailable
+- `Database connection string missing`
+  - `DATABASE_URL` (or `HYPERDRIVE_CONNECTION_STRING` on Workers) is not set
+- `Unauthorized` from `/api/metrics` or the reminder endpoints
+  - The internal secret is missing or wrong
+- `AI provider not configured — set it in Settings`
+  - No OpenAI-compatible endpoint/key is set in the database or environment
+- Empty assistant citations
+  - `FEATURE_ASSISTANT_RETRIEVAL` is off or the knowledge base has no matching
+    chunks

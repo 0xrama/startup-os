@@ -26,9 +26,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const llcAccess = await requireApiLlcAccess(session.user.id, doc.llcId, {
-    editable: true,
-  });
+  const llcAccess = await requireApiLlcAccess(session.user.id, doc.llcId);
 
   if ("response" in llcAccess) return llcAccess.response;
 

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getUserSubscription, hasActiveSubscription } from "@/lib/subscription";
 import {
   user,
   session,
@@ -14,9 +13,7 @@ import {
   reminders,
   chatConversations,
   chatMessages,
-  subscriptions,
   auditLogs,
-  llcCollaborators,
   userEncryption,
   noticeCases,
 } from "@/lib/schema";
@@ -31,17 +28,6 @@ export async function DELETE() {
   }
 
   const userId = sess.user.id;
-
-  const subscription = await getUserSubscription(userId);
-
-  if (hasActiveSubscription(subscription)) {
-    return NextResponse.json(
-      {
-        error: "Please cancel your subscription before deleting your account.",
-      },
-      { status: 400 }
-    );
-  }
 
   // Get user's LLC IDs for cascading deletes
   const userLlcs = await db
@@ -91,13 +77,9 @@ export async function DELETE() {
         .delete(complianceTasks)
         .where(inArray(complianceTasks.llcId, llcIds));
       await tx.delete(documents).where(inArray(documents.llcId, llcIds));
-      await tx
-        .delete(llcCollaborators)
-        .where(inArray(llcCollaborators.llcId, llcIds));
     }
 
     await tx.delete(llcs).where(eq(llcs.userId, userId));
-    await tx.delete(subscriptions).where(eq(subscriptions.userId, userId));
     await tx.delete(auditLogs).where(eq(auditLogs.userId, userId));
     await tx.delete(userEncryption).where(eq(userEncryption.userId, userId));
     await tx.delete(session).where(eq(session.userId, userId));

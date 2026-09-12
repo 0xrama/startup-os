@@ -12,6 +12,6 @@
 ## Risk
 
 - auth
-- billing
 - documents
+- reminders
 - observability

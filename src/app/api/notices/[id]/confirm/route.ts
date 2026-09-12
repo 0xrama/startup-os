@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireApiContext({ feature: "notice-triage" });
+    const context = await requireApiContext();
 
     if ("response" in context) return context.response;
     const { session } = context;
@@ -25,9 +25,7 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const access = await requireApiLlcAccess(session.user.id, notice.llcId, {
-      editable: true,
-    });
+    const access = await requireApiLlcAccess(session.user.id, notice.llcId);
 
     if ("response" in access) return access.response;
 

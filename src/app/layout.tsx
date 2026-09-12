@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { AnalyticsProvider } from "@/components/analytics-provider";
-import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,11 +19,7 @@ export default function RootLayout({
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="font-sans antialiased">
-        <AnalyticsProvider />
-        {children}
-        <CookieConsent />
-      </body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }

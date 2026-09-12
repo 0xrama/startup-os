@@ -32,8 +32,6 @@ type ThreadSidebarProps = {
   conversationId: string | null;
   loadingThreads: boolean;
   threadError: string | null;
-  assistantCapLabel: string | null;
-  isAdminBypass: boolean;
   sidebarOpen: boolean;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
@@ -46,8 +44,6 @@ export function ThreadSidebar({
   conversationId,
   loadingThreads,
   threadError,
-  assistantCapLabel,
-  isAdminBypass,
   sidebarOpen,
   onSelectConversation,
   onNewConversation,
@@ -146,24 +142,6 @@ export function ThreadSidebar({
               </div>
             )}
           </div>
-
-          {assistantCapLabel || isAdminBypass ? (
-            <div className="border-t border-border px-3 py-2.5">
-              {isAdminBypass ? (
-                <div className="mb-1 flex items-center gap-1.5">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  <span className="text-[11px] font-medium text-amber-600">
-                    Admin — billing gates bypassed
-                  </span>
-                </div>
-              ) : null}
-              {assistantCapLabel ? (
-                <span className="text-[11px] text-muted-foreground">
-                  {assistantCapLabel}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
         </motion.aside>
       )}
     </AnimatePresence>

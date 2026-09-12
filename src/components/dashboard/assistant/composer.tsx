@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -9,7 +10,6 @@ type ComposerProps = {
   composerRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (value: string) => void;
   onSend: () => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 };
 
 export function Composer({
@@ -18,8 +18,22 @@ export function Composer({
   composerRef,
   onChange,
   onSend,
-  onKeyDown,
 }: ComposerProps) {
+  useEffect(() => {
+    const textarea = composerRef.current;
+
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
+  }, [composerRef, input]);
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      onSend();
+    }
+  }
+
   return (
     <div className="px-4 pb-4 pt-2">
       <div className="mx-auto max-w-3xl">
@@ -30,7 +44,7 @@ export function Composer({
             rows={1}
             placeholder="Message Pax Navigator..."
             onChange={(e) => onChange(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={handleKeyDown}
             className="max-h-[220px] min-h-[48px] resize-none border-0 bg-transparent px-4 py-3 text-[14px] leading-6 shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0"
           />
           <div className="flex items-center justify-between px-3 pb-2.5">

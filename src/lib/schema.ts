@@ -1,11 +1,15 @@
-import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 import type { JsonValue } from "./json";
 
 const nextId = () => crypto.randomUUID();
-
-/** Roles a collaborator can hold on an LLC. */
-export type CollaboratorRole = "owner" | "editor" | "viewer";
 
 /** Roles stored for chat messages. */
 export type ChatRole = "user" | "assistant";
@@ -18,37 +22,33 @@ export type AuditMetadata = { [key: string]: JsonValue };
 // We extend the user table with additional columns via Better Auth config.
 // The tables below reference user.id as text.
 
-export const user = sqliteTable("user", {
+export const user = pgTable("user", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
   name: text("name"),
   email: text("email").notNull(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).default(false),
+  emailVerified: boolean("email_verified").default(false),
   image: text("image"),
   phone: text("phone"),
-  phoneVerified: integer("phone_verified", { mode: "boolean" }).default(false),
-  whatsappOptedIn: integer("whatsapp_opted_in", { mode: "boolean" }).default(
-    false
-  ),
+  phoneVerified: boolean("phone_verified").default(false),
+  whatsappOptedIn: boolean("whatsapp_opted_in").default(false),
   timezone: text("timezone").default("UTC"),
-  onboardingCompleted: integer("onboarding_completed", {
-    mode: "boolean",
-  }).default(false),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  onboardingCompleted: boolean("onboarding_completed").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const session = sqliteTable("session", {
+export const session = pgTable("session", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   token: text("token").notNull().unique(),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   ipAddress: text("ip_address"),
@@ -58,7 +58,7 @@ export const session = sqliteTable("session", {
     .references(() => user.id, { onDelete: "cascade" }),
 });
 
-export const account = sqliteTable("account", {
+export const account = pgTable("account", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -70,36 +70,36 @@ export const account = sqliteTable("account", {
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   idToken: text("id_token"),
-  accessTokenExpiresAt: integer("access_token_expires_at", {
-    mode: "timestamp",
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
   }),
-  refreshTokenExpiresAt: integer("refresh_token_expires_at", {
-    mode: "timestamp",
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
   }),
   scope: text("scope"),
   password: text("password"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
 
-export const verification = sqliteTable("verification", {
+export const verification = pgTable("verification", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── LLCs ────────────────────────────────────────────────────────
 
-export const llcs = sqliteTable("llcs", {
+export const llcs = pgTable("llcs", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -116,28 +116,34 @@ export const llcs = sqliteTable("llcs", {
   registeredAgent: text("registered_agent"),
   raRenewalDate: text("ra_renewal_date"),
   annualReportMonth: integer("annual_report_month"),
-  members: text("members", { mode: "json" }).$type<
-    { name: string; ownershipPct: number; country: string; taxIdType: string }[]
-  >(),
-  filingPreferences: text("filing_preferences", { mode: "json" }).$type<{
+  members:
+    jsonb("members").$type<
+      {
+        name: string;
+        ownershipPct: number;
+        country: string;
+        taxIdType: string;
+      }[]
+    >(),
+  filingPreferences: jsonb("filing_preferences").$type<{
     remindDaysBefore: number;
     channels: ("email" | "whatsapp")[];
     checklists?: {
       first30Days?: Record<string, boolean>;
     };
   }>(),
-  encryptedData: text("encrypted_data", { mode: "json" }).$type<{
+  encryptedData: jsonb("encrypted_data").$type<{
     version: 1;
     iv: string;
     ciphertext: string;
   } | null>(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Documents ───────────────────────────────────────────────────
 
-export const documents = sqliteTable("documents", {
+export const documents = pgTable("documents", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -157,7 +163,7 @@ export const documents = sqliteTable("documents", {
   processingStatus: text("processing_status").default("pending"),
   processingError: text("processing_error"),
   extractedTextStatus: text("extracted_text_status").default("pending"),
-  extractedMetadata: text("extracted_metadata", { mode: "json" }).$type<{
+  extractedMetadata: jsonb("extracted_metadata").$type<{
     summary?: string;
     textPreview?: string;
     issuer?: string;
@@ -173,48 +179,46 @@ export const documents = sqliteTable("documents", {
     classificationConfidence?: number;
     extractedText?: string;
   } | null>(),
-  encryptedMetadata: text("encrypted_metadata", { mode: "json" }).$type<{
+  encryptedMetadata: jsonb("encrypted_metadata").$type<{
     version: 1;
     iv: string;
     ciphertext: string;
   } | null>(),
   fileIv: text("file_iv"),
-  wrappedFileKey: text("wrapped_file_key", { mode: "json" }).$type<{
+  wrappedFileKey: jsonb("wrapped_file_key").$type<{
     version: 1;
     iv: string;
     ciphertext: string;
   } | null>(),
   encryptionVersion: integer("encryption_version").default(1),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const userEncryption = sqliteTable("user_encryption", {
+export const userEncryption = pgTable("user_encryption", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
   userId: text("user_id").notNull().unique(),
-  pinWrappedMasterKey: text("pin_wrapped_master_key", { mode: "json" }).$type<{
+  pinWrappedMasterKey: jsonb("pin_wrapped_master_key").$type<{
     version: 1;
     salt: string;
     iv: string;
     ciphertext: string;
   }>(),
-  recoveryWrappedMasterKey: text("recovery_wrapped_master_key", {
-    mode: "json",
-  }).$type<{
+  recoveryWrappedMasterKey: jsonb("recovery_wrapped_master_key").$type<{
     version: 1;
     salt: string;
     iv: string;
     ciphertext: string;
   }>(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Compliance Tasks ────────────────────────────────────────────
 
-export const complianceTasks = sqliteTable("compliance_tasks", {
+export const complianceTasks = pgTable("compliance_tasks", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -226,11 +230,11 @@ export const complianceTasks = sqliteTable("compliance_tasks", {
   category: text("category"),
   dueDate: text("due_date").notNull(),
   status: text("status").default("upcoming"),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  recurring: integer("recurring", { mode: "boolean" }).default(false),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  recurring: boolean("recurring").default(false),
   recurrenceRule: text("recurrence_rule"),
   source: text("source").default("system"),
-  metadata: text("metadata", { mode: "json" }).$type<{
+  metadata: jsonb("metadata").$type<{
     filingCode?: string;
     filingYear?: number;
     optional?: boolean;
@@ -257,13 +261,13 @@ export const complianceTasks = sqliteTable("compliance_tasks", {
       notes?: string | null;
     };
   } | null>(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Reminders ───────────────────────────────────────────────────
 
-export const reminders = sqliteTable("reminders", {
+export const reminders = pgTable("reminders", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -272,34 +276,38 @@ export const reminders = sqliteTable("reminders", {
     .references(() => complianceTasks.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull(),
   channel: text("channel").notNull(),
-  scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
-  sentAt: integer("sent_at", { mode: "timestamp" }),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
   status: text("status").default("pending"),
   messageId: text("message_id"),
   idempotencyKey: text("idempotency_key"),
   attemptCount: integer("attempt_count").default(0),
   lastError: text("last_error"),
-  processingStartedAt: integer("processing_started_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  processingStartedAt: timestamp("processing_started_at", {
+    withTimezone: true,
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Chat ────────────────────────────────────────────────────────
 
-export const chatConversations = sqliteTable("chat_conversations", {
+export const chatConversations = pgTable("chat_conversations", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
   llcId: text("llc_id").references(() => llcs.id, { onDelete: "set null" }),
   userId: text("user_id").notNull(),
   title: text("title"),
-  lastMessageAt: integer("last_message_at", { mode: "timestamp" }).defaultNow(),
-  archivedAt: integer("archived_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  lastMessageAt: timestamp("last_message_at", {
+    withTimezone: true,
+  }).defaultNow(),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const chatMessages = sqliteTable("chat_messages", {
+export const chatMessages = pgTable("chat_messages", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -311,9 +319,9 @@ export const chatMessages = sqliteTable("chat_messages", {
   model: text("model"),
   finishReason: text("finish_reason"),
   content: text("content"),
-  toolCalls: text("tool_calls", { mode: "json" }),
-  toolResults: text("tool_results", { mode: "json" }),
-  citations: text("citations", { mode: "json" }).$type<
+  toolCalls: jsonb("tool_calls"),
+  toolResults: jsonb("tool_results"),
+  citations: jsonb("citations").$type<
     {
       label: string;
       sourceType: "irs" | "state" | "user_document";
@@ -324,20 +332,19 @@ export const chatMessages = sqliteTable("chat_messages", {
       documentId?: string;
     }[]
   >(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Knowledge Chunks (RAG — future) ────────────────────────────
 
-export const knowledgeChunks = sqliteTable("knowledge_chunks", {
+export const knowledgeChunks = pgTable("knowledge_chunks", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
   source: text("source").notNull(),
   sourceId: text("source_id"),
   content: text("content").notNull(),
-  embedding: text("embedding", { mode: "json" }).$type<number[]>(),
-  metadata: text("metadata", { mode: "json" }).$type<{
+  metadata: jsonb("metadata").$type<{
     kind?: "irs" | "state" | "user_document";
     title?: string;
     page?: number;
@@ -349,46 +356,22 @@ export const knowledgeChunks = sqliteTable("knowledge_chunks", {
     llcId?: string;
     effectiveDate?: string;
   }>(),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-// ─── Subscriptions ───────────────────────────────────────────────
+// ─── App Settings ────────────────────────────────────────────────
 
-export const subscriptions = sqliteTable("subscriptions", {
+export const appSettings = pgTable("app_settings", {
   id: text("id")
     .primaryKey()
-    .$default(() => nextId()),
-  userId: text("user_id").notNull().unique(),
-  polarCustomerId: text("polar_customer_id"),
-  polarSubscriptionId: text("polar_subscription_id"),
-  plan: text("plan").$type<"starter" | "pro">(),
-  status: text("status").default("expired"),
-  currentPeriodStart: integer("current_period_start", {
-    mode: "timestamp",
-  }),
-  currentPeriodEnd: integer("current_period_end", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+    .$default(() => "singleton"),
+  aiBaseUrl: text("ai_base_url"),
+  aiApiKey: text("ai_api_key"),
+  aiModel: text("ai_model"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const llcCollaborators = sqliteTable("llc_collaborators", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  llcId: text("llc_id")
-    .notNull()
-    .references(() => llcs.id, { onDelete: "cascade" }),
-  email: text("email").notNull(),
-  userId: text("user_id"),
-  role: text("role").$type<CollaboratorRole>().notNull().default("viewer"),
-  status: text("status").notNull().default("pending"),
-  invitedBy: text("invited_by").notNull(),
-  acceptedAt: integer("accepted_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-});
-
-export const noticeCases = sqliteTable("notice_cases", {
+export const noticeCases = pgTable("notice_cases", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -406,24 +389,22 @@ export const noticeCases = sqliteTable("notice_cases", {
   responseDueDate: text("response_due_date"),
   summary: text("summary"),
   riskLevel: text("risk_level"),
-  structuredData: text("structured_data", {
-    mode: "json",
-  }).$type<JsonValue | null>(),
-  draftTaskPayload: text("draft_task_payload", { mode: "json" }).$type<{
+  structuredData: jsonb("structured_data").$type<JsonValue | null>(),
+  draftTaskPayload: jsonb("draft_task_payload").$type<{
     title?: string;
     description?: string;
     dueDate?: string;
     category?: string;
     reminders?: { offsetDays: number; channel: "email" | "whatsapp" }[];
   } | null>(),
-  confirmedAt: integer("confirmed_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ─── Audit Logs ──────────────────────────────────────────────────
 
-export const auditLogs = sqliteTable("audit_logs", {
+export const auditLogs = pgTable("audit_logs", {
   id: text("id")
     .primaryKey()
     .$default(() => nextId()),
@@ -431,7 +412,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   action: text("action").notNull(),
   resourceType: text("resource_type"),
   resourceId: text("resource_id"),
-  metadata: text("metadata", { mode: "json" }).$type<AuditMetadata | null>(),
+  metadata: jsonb("metadata").$type<AuditMetadata | null>(),
   ipAddress: text("ip_address"),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });

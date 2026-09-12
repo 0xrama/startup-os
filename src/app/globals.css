@@ -454,13 +454,6 @@ select:focus-visible {
   transition: border-color 0.2s ease;
 }
 
-/* ─── Pricing Card Highlight ───────────────────────────────────── */
-
-.pricing-recommended {
-  position: relative;
-  border: 2px solid var(--primary) !important;
-}
-
 /* ─── Subtle Noise Overlay ─────────────────────────────────────── */
 
 .noise-overlay {

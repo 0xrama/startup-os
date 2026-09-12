@@ -125,8 +125,7 @@ function getTaxClassificationOptions(entityType: string) {
 export default function OnboardingPage() {
   const router = useRouter();
   const { masterKey, unlocked, configured } = useEncryption();
-  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
-  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
+  const whatsappAvailable = process.env.NEXT_PUBLIC_WHATSAPP_ENABLED === "true";
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -150,46 +149,6 @@ export default function OnboardingPage() {
 
   const [remindDaysBefore, setRemindDaysBefore] = useState(30);
   const [channels, setChannels] = useState<string[]>(["email"]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function verifySubscription() {
-      try {
-        const response = await fetch("/api/billing/status", {
-          credentials: "include",
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          router.replace("/dashboard/settings/billing");
-
-          return;
-        }
-
-        const data = await response.json();
-
-        if (!data.active) {
-          router.replace("/dashboard/settings/billing");
-
-          return;
-        }
-
-        if (active) {
-          setWhatsappAvailable(Boolean(data.limits?.whatsappReminders));
-          setSubscriptionChecked(true);
-        }
-      } catch {
-        router.replace("/dashboard/settings/billing");
-      }
-    }
-
-    void verifySubscription();
-
-    return () => {
-      active = false;
-    };
-  }, [router]);
 
   useEffect(() => {
     if (entityType !== "single-member") return;
@@ -225,16 +184,6 @@ export default function OnboardingPage() {
       setTaxClassification("partnership");
     }
   }, [entityType, taxClassification]);
-
-  if (!subscriptionChecked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">
-          Checking your subscription…
-        </p>
-      </div>
-    );
-  }
 
   const availableTaxClassifications = getTaxClassificationOptions(entityType);
 
@@ -772,7 +721,7 @@ export default function OnboardingPage() {
                   </div>
                   {!whatsappAvailable ? (
                     <p className="text-xs text-muted-foreground">
-                      WhatsApp reminders are available on the Pro plan.
+                      WhatsApp reminders are not configured on this instance.
                     </p>
                   ) : null}
                 </div>

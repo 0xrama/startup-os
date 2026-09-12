@@ -1,11 +1,11 @@
-import { requirePageSubscription } from "@/lib/access";
+import { requirePageSession } from "@/lib/access";
 
 export default async function LlcLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requirePageSubscription();
+  await requirePageSession();
 
   return children;
 }

@@ -10,9 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireApiContext({
-      feature: "document-intelligence",
-    });
+    const context = await requireApiContext();
 
     if ("response" in context) return context.response;
     const { session } = context;

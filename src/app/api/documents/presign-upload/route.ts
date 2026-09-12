@@ -19,7 +19,7 @@ const ALLOWED_TYPES = [
 const MAX_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(request: NextRequest) {
-  const context = await requireApiContext({ feature: "documents" });
+  const context = await requireApiContext();
 
   if ("response" in context) return context.response;
   const { session } = context;
@@ -44,9 +44,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const llcAccess = await requireApiLlcAccess(session.user.id, llcId, {
-    editable: true,
-  });
+  const llcAccess = await requireApiLlcAccess(session.user.id, llcId);
 
   if ("response" in llcAccess) return llcAccess.response;
 
