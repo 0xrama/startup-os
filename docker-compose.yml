@@ -12,18 +12,20 @@ services:
       FEATURE_ASSISTANT_RETRIEVAL: "false"
       FEATURE_REQUEST_METRICS: "true"
       R2_ENDPOINT: http://minio:9000
-      R2_ACCESS_KEY_ID: local
-      R2_SECRET_ACCESS_KEY: local
+      R2_PUBLIC_ENDPOINT: http://localhost:9000
+      R2_ACCESS_KEY_ID: localadmin
+      R2_SECRET_ACCESS_KEY: localadmin
       R2_BUCKET_NAME: startup-os-local
       R2_FORCE_PATH_STYLE: "true"
     volumes:
       - .:/workspace
       - app_node_modules:/workspace/node_modules
+    # Avoid Turbopack refresh loops when the checkout is bind-mounted on macOS.
     command: >-
       sh -lc "corepack enable &&
       pnpm install --frozen-lockfile &&
       pnpm db:migrate &&
-      pnpm dev -- --hostname 0.0.0.0"
+      pnpm dev -- --webpack --disable-source-maps --hostname 0.0.0.0"
     ports:
       - "3000:3000"
     depends_on:
@@ -66,22 +68,22 @@ services:
       - "1025:1025"
       - "8025:8025"
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: local
-      MINIO_ROOT_PASSWORD: local
+      MINIO_ROOT_USER: localadmin
+      MINIO_ROOT_PASSWORD: localadmin
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - minio_data:/data
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     depends_on:
       - minio
     entrypoint: >-
-      sh -c "until mc alias set local http://minio:9000 local local; do sleep 1; done &&
+      sh -c "until mc alias set local http://minio:9000 localadmin localadmin; do sleep 1; done &&
       mc mb --ignore-existing local/startup-os-local"
 
 volumes:

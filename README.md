@@ -33,6 +33,28 @@ docker compose up
 Open `http://localhost:3000`. Signup is open until the first account exists,
 then the instance is locked to that account.
 
+### Low-resource OrbStack setup
+
+For local testing with lower CPU and memory limits, use the small Compose
+stack. It runs the app, a tuned PostgreSQL instance, and headless MinIO, with a
+combined memory ceiling of about 3 GB (normal idle use is much lower).
+
+```bash
+docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml logs -f workspace
+```
+
+Open `http://localhost:3001`. Hot reload works from the host checkout. Enable
+the reminder scheduler only when testing reminders:
+
+```bash
+docker compose -f docker-compose.local.yml --profile reminders up -d
+```
+
+Stop the stack with `docker compose -f docker-compose.local.yml down`. Add
+`-v` to delete its local database, documents, dependencies, and build cache.
+AI, email, WhatsApp, and Google OAuth still require their provider credentials.
+
 ## Quick start (local Node)
 
 ```bash
@@ -56,6 +78,7 @@ the in-app **Settings** page (stored in the database).
 | `BETTER_AUTH_URL`                                                                     | Yes      | Auth base URL.                                                                          |
 | `NEXT_PUBLIC_APP_URL`                                                                 | Yes      | Public app origin.                                                                      |
 | `R2_ENDPOINT` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET_NAME`        | Yes      | S3-compatible storage for the vault.                                                    |
+| `R2_PUBLIC_ENDPOINT`                                                                  | No       | Browser-facing storage URL when `R2_ENDPOINT` is only reachable inside Docker.          |
 | `R2_FORCE_PATH_STYLE`                                                                 | MinIO    | Set `true` for path-style endpoints.                                                    |
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`                                             | No       | OpenAI-compatible endpoint defaults (overridable in Settings).                          |
 | `INTERNAL_CRON_SECRET`                                                                | Cron     | Signs internal reminder requests. Vercel Cron uses `CRON_SECRET`.                       |

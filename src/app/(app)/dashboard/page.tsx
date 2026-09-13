@@ -87,7 +87,7 @@ export default async function DashboardPage() {
             Here&apos;s an overview of your compliance status.
           </p>
         </div>
-        <Link href="/onboarding">
+        <Link href="/onboarding?add=1">
           <Button size="sm" className="gap-1.5 text-[13px]">
             <Plus className="h-3.5 w-3.5" />
             Add entity
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
             Add your first LLC or corporation to start tracking compliance
             obligations.
           </p>
-          <Link href="/onboarding">
+          <Link href="/onboarding?add=1">
             <Button size="sm" className="mt-5 gap-1.5 text-[13px]">
               <Plus className="h-3.5 w-3.5" />
               Add entity

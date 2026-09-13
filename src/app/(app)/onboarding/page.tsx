@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,6 +102,54 @@ type MemberEntry = {
   taxIdType: string;
 };
 
+type LlcSummary = {
+  id: string;
+  name: string;
+  state: string;
+  entityType: string;
+};
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function loadEntities() {
+  const response = await fetch("/api/llcs", {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) return [];
+
+  return (await response.json()) as LlcSummary[];
+}
+
+async function recoverCreatedEntity({
+  name,
+  state,
+  entityType,
+}: Omit<LlcSummary, "id">) {
+  for (const delay of [250, 750, 1500]) {
+    await wait(delay);
+
+    try {
+      const entities = await loadEntities();
+      const match = entities.find(
+        (entity) =>
+          entity.name.trim().toLowerCase() === name.trim().toLowerCase() &&
+          entity.state === state &&
+          entity.entityType === entityType
+      );
+
+      if (match) return match;
+    } catch {
+      // The development server may still be restarting; retry briefly.
+    }
+  }
+
+  return null;
+}
+
 function getTaxClassificationOptions(entityType: string) {
   if (entityType === "corporation") {
     return TAX_CLASSIFICATIONS.filter(
@@ -149,6 +196,24 @@ export default function OnboardingPage() {
 
   const [remindDaysBefore, setRemindDaysBefore] = useState(30);
   const [channels, setChannels] = useState<string[]>(["email"]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("add") === "1") return;
+
+    let cancelled = false;
+
+    void loadEntities()
+      .then((entities) => {
+        if (!cancelled && entities[0]) {
+          router.replace(`/dashboard/llc/${entities[0].id}`);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   useEffect(() => {
     if (entityType !== "single-member") return;
@@ -266,14 +331,35 @@ export default function OnboardingPage() {
         }),
       });
 
+      const responseText = await res.text();
+      const data = responseText
+        ? (JSON.parse(responseText) as { id?: string; error?: string })
+        : null;
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create LLC");
+        throw new Error(data?.error || "Failed to create entity");
       }
 
-      const llc = await res.json();
-      router.push(`/dashboard/llc/${llc.id}`);
+      if (!data?.id) {
+        throw new Error("The server returned an incomplete response.");
+      }
+
+      router.replace(`/dashboard/llc/${data.id}`);
+      router.refresh();
     } catch (err) {
+      const recoveredEntity = await recoverCreatedEntity({
+        name,
+        state,
+        entityType,
+      });
+
+      if (recoveredEntity) {
+        router.replace(`/dashboard/llc/${recoveredEntity.id}`);
+        router.refresh();
+
+        return;
+      }
+
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }

@@ -16,19 +16,28 @@ function getConnectionString() {
 }
 
 function createDb() {
-  const pool = new Pool({ connectionString: getConnectionString() });
+  const pool = new Pool({
+    connectionString: getConnectionString(),
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
 
   return drizzle(pool, { schema });
 }
 
 type DbInstance = ReturnType<typeof createDb>;
 
-let cachedDb: DbInstance | null = null;
+type GlobalWithDb = typeof globalThis & {
+  __paxDb?: DbInstance;
+};
+
+const globalWithDb = globalThis as GlobalWithDb;
 
 export function getDb() {
-  cachedDb ??= createDb();
+  globalWithDb.__paxDb ??= createDb();
 
-  return cachedDb;
+  return globalWithDb.__paxDb;
 }
 
 // SAFETY: the Proxy target is never read; every access is routed through

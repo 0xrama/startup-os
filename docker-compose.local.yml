@@ -1,0 +1,158 @@
+# Low-resource local development stack for OrbStack or Docker Desktop.
+#
+# Start:  docker compose -f docker-compose.local.yml up -d
+# Logs:   docker compose -f docker-compose.local.yml logs -f workspace
+# Stop:   docker compose -f docker-compose.local.yml down
+# Reset:  docker compose -f docker-compose.local.yml down -v
+#
+# Open http://localhost:3001. The default stack includes the app, PostgreSQL,
+# and S3-compatible document storage. The reminder scheduler is opt-in:
+#   docker compose -f docker-compose.local.yml --profile reminders up -d
+
+name: startup-os-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    command:
+      - postgres
+      - -c
+      - shared_buffers=32MB
+      - -c
+      - effective_cache_size=96MB
+      - -c
+      - max_connections=20
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pax
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pax"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 10s
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: localadmin
+      MINIO_ROOT_PASSWORD: localadmin
+      MINIO_BROWSER: "off"
+    ports:
+      - "9000:9000"
+    volumes:
+      - minio_data:/data
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 10s
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >-
+      sh -c "until mc alias set local http://minio:9000 localadmin localadmin; do sleep 1; done &&
+      mc mb --ignore-existing local/startup-os-local"
+    mem_limit: 64m
+    cpus: 0.25
+
+  workspace:
+    image: node:22-alpine
+    init: true
+    working_dir: /workspace
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: --max-old-space-size=2048
+      NEXT_TELEMETRY_DISABLED: "1"
+      HUSKY: "0"
+      NEXT_PUBLIC_APP_URL: http://localhost:3001
+      BETTER_AUTH_URL: http://localhost:3001
+      BETTER_AUTH_SECRET: local-development-secret-change-me
+      INTERNAL_CRON_SECRET: local-development-secret-change-me
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pax
+      R2_ENDPOINT: http://minio:9000
+      R2_PUBLIC_ENDPOINT: http://localhost:9000
+      R2_ACCESS_KEY_ID: localadmin
+      R2_SECRET_ACCESS_KEY: localadmin
+      R2_BUCKET_NAME: startup-os-local
+      R2_FORCE_PATH_STYLE: "true"
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      NEXT_PUBLIC_WHATSAPP_ENABLED: ${NEXT_PUBLIC_WHATSAPP_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-false}
+      FEATURE_ASSISTANT_RETRIEVAL: "true"
+      FEATURE_REQUEST_METRICS: "true"
+    volumes:
+      - .:/workspace
+      # Keep Linux dependencies and build output out of the macOS checkout.
+      - workspace_node_modules:/workspace/node_modules
+      - workspace_next:/workspace/.next
+    # Webpack is more stable than Turbopack across macOS bind mounts.
+    command: >-
+      sh -lc "corepack enable &&
+      pnpm install --frozen-lockfile --prefer-offline &&
+      pnpm db:migrate &&
+      exec pnpm dev --webpack --disable-source-maps --hostname 0.0.0.0"
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    mem_limit: 2560m
+    cpus: 2.0
+    stop_grace_period: 10s
+
+  cron:
+    image: curlimages/curl:latest
+    profiles: ["reminders"]
+    restart: unless-stopped
+    depends_on:
+      workspace:
+        condition: service_healthy
+    entrypoint: >-
+      sh -c "while true; do
+        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://workspace:3000/api/internal/reminders/enqueue-due >/dev/null || true;
+        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://workspace:3000/api/internal/reminders/process >/dev/null || true;
+        sleep 900;
+      done"
+    environment:
+      INTERNAL_CRON_SECRET: local-development-secret-change-me
+    mem_limit: 64m
+    cpus: 0.25
+
+volumes:
+  postgres_data:
+  minio_data:
+  workspace_node_modules:
+  workspace_next:

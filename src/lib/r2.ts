@@ -1,4 +1,4 @@
-async function createR2Client() {
+async function createR2Client(endpoint: string) {
   const [
     { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand },
     { getSignedUrl },
@@ -9,7 +9,7 @@ async function createR2Client() {
 
   const client = new S3Client({
     region: "auto",
-    endpoint: process.env.R2_ENDPOINT!,
+    endpoint,
     credentials: {
       accessKeyId: process.env.R2_ACCESS_KEY_ID!,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
@@ -26,12 +26,23 @@ async function createR2Client() {
   };
 }
 
-let r2Client: ReturnType<typeof createR2Client> | undefined;
+const r2Clients = new Map<string, ReturnType<typeof createR2Client>>();
 
-function getR2Client() {
-  r2Client ??= createR2Client();
+function getR2Client(endpoint = process.env.R2_ENDPOINT!) {
+  const existingClient = r2Clients.get(endpoint);
 
-  return r2Client;
+  if (existingClient) return existingClient;
+
+  const client = createR2Client(endpoint);
+  r2Clients.set(endpoint, client);
+
+  return client;
+}
+
+function getSigningR2Client() {
+  return getR2Client(
+    process.env.R2_PUBLIC_ENDPOINT || process.env.R2_ENDPOINT!
+  );
 }
 
 const BUCKET = process.env.R2_BUCKET_NAME!;
@@ -41,7 +52,7 @@ export async function getUploadUrl(
   contentType = "application/octet-stream",
   expiresIn = 300
 ) {
-  const { client, PutObjectCommand, getSignedUrl } = await getR2Client();
+  const { client, PutObjectCommand, getSignedUrl } = await getSigningR2Client();
 
   const command = new PutObjectCommand({
     Bucket: BUCKET,
@@ -53,7 +64,7 @@ export async function getUploadUrl(
 }
 
 export async function getDownloadUrl(key: string, expiresIn = 900) {
-  const { client, GetObjectCommand, getSignedUrl } = await getR2Client();
+  const { client, GetObjectCommand, getSignedUrl } = await getSigningR2Client();
 
   const command = new GetObjectCommand({
     Bucket: BUCKET,

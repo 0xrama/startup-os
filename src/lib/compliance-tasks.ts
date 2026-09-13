@@ -201,12 +201,18 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
   return tasks;
 }
 
-export async function seedComplianceTasks(llcId: string, llc: LLCProfile) {
+type ComplianceTaskWriter = Pick<typeof db, "insert">;
+
+export async function seedComplianceTasks(
+  llcId: string,
+  llc: LLCProfile,
+  database: ComplianceTaskWriter = db
+) {
   const tasks = generateComplianceTasks(llc);
 
   if (tasks.length === 0) return [];
 
-  const inserted = await db
+  const inserted = await database
     .insert(complianceTasks)
     .values(
       tasks.map((t) => ({
