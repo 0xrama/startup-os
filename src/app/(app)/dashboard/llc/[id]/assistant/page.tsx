@@ -12,9 +12,28 @@ import type {
   Conversation,
   Message,
 } from "@/components/dashboard/assistant/types";
+import { useEncryption } from "@/components/security/encryption-provider";
+import { decryptJson, type CipherPayload } from "@/lib/e2ee";
+import type { SecureLlcPayload } from "@/lib/secure-llc";
+
+type SecureEntityContext = SecureLlcPayload;
+
+type AssistantLlcResponse = SecureLlcPayload & {
+  encryptedData: CipherPayload | null;
+};
 
 export default function AssistantPage() {
   const { id: llcId } = useParams<{ id: string }>();
+
+  const { masterKey, loading: encryptionLoading } = useEncryption();
+
+  const [secureEntityContext, setSecureEntityContext] =
+    useState<SecureEntityContext>();
+
+  const [secureContextStatus, setSecureContextStatus] = useState<
+    "loading" | "ready" | "locked" | "error"
+  >("loading");
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -137,6 +156,66 @@ export default function AssistantPage() {
     void loadConversations();
   }, [loadConversations]);
 
+  useEffect(() => {
+    if (encryptionLoading) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function loadSecureEntityContext() {
+      setSecureContextStatus("loading");
+
+      const response = await fetch(`/api/llcs/${llcId}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load the entity profile.");
+      }
+
+      // SAFETY: /api/llcs/[id] serializes the LLC row and its encrypted payload;
+      // the fields used here are constrained by the LLC creation API and schema.
+      const llc = (await response.json()) as AssistantLlcResponse;
+
+      const fallbackContext: SecureEntityContext = {
+        ein: llc.ein,
+        registeredAgent: llc.registeredAgent,
+        members: llc.members ?? [],
+      };
+
+      if (llc.encryptedData && !masterKey) {
+        if (!cancelled) setSecureContextStatus("locked");
+
+        return;
+      }
+
+      const context =
+        llc.encryptedData && masterKey
+          ? await decryptJson<SecureEntityContext>(masterKey, llc.encryptedData)
+          : fallbackContext;
+
+      if (!cancelled) {
+        setSecureEntityContext(context);
+        setSecureContextStatus("ready");
+      }
+    }
+
+    void loadSecureEntityContext().catch((error) => {
+      if (
+        !cancelled &&
+        !(error instanceof DOMException && error.name === "AbortError")
+      ) {
+        setSecureContextStatus("error");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [encryptionLoading, llcId, masterKey]);
+
   function startNewConversation() {
     setConversationId(null);
     setMessages([]);
@@ -147,6 +226,18 @@ export default function AssistantPage() {
   }
 
   async function handleSend() {
+    if (secureContextStatus !== "ready") {
+      setGateMessage(
+        secureContextStatus === "locked"
+          ? "Unlock the vault before asking Pax to use this entity profile."
+          : secureContextStatus === "error"
+            ? "The entity profile could not be loaded. Refresh and try again."
+            : "Wait for the entity profile to finish loading."
+      );
+
+      return;
+    }
+
     if (!input.trim() || isLoading) return;
 
     setGateMessage(null);
@@ -172,7 +263,12 @@ export default function AssistantPage() {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, llcId, message: trimmedInput }),
+        body: JSON.stringify({
+          conversationId,
+          llcId,
+          message: trimmedInput,
+          secureEntityContext,
+        }),
       });
 
       if (!res.ok) {
@@ -314,6 +410,18 @@ export default function AssistantPage() {
             </div>
           ) : null}
 
+          {secureContextStatus !== "ready" ? (
+            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
+              <div className="rounded-lg border border-border bg-secondary/40 px-4 py-2.5 text-xs text-muted-foreground">
+                {secureContextStatus === "locked"
+                  ? "Unlock the vault to let Pax use the saved owner profile."
+                  : secureContextStatus === "error"
+                    ? "The saved owner profile could not be loaded."
+                    : "Loading the saved owner profile…"}
+              </div>
+            </div>
+          ) : null}
+
           {/* Messages area or empty state */}
           {!loadingMessages && !hasMessages ? (
             <EmptyState
@@ -332,6 +440,7 @@ export default function AssistantPage() {
           <Composer
             input={input}
             isLoading={isLoading}
+            disabled={secureContextStatus !== "ready"}
             composerRef={composerRef}
             onChange={setInput}
             onSend={() => void handleSend()}

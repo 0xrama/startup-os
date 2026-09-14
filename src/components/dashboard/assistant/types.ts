@@ -6,6 +6,8 @@ export type Citation = {
   page?: number;
   section?: string;
   documentId?: string;
+  sourceUrl?: string;
+  revision?: string;
 };
 
 export type Message = {

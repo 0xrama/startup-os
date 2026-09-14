@@ -83,10 +83,28 @@ export function MessageBubble({ message, isLoading }: MessageBubbleProps) {
                           >
                             {citation.sourceType.replace("_", " ")}
                           </Badge>
-                          <span className="truncate text-xs font-medium">
-                            {citation.sourceTitle}
-                          </span>
+                          {citation.sourceUrl ? (
+                            <a
+                              href={citation.sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate text-xs font-medium underline-offset-2 hover:underline"
+                            >
+                              {citation.sourceTitle}
+                            </a>
+                          ) : (
+                            <span className="truncate text-xs font-medium">
+                              {citation.sourceTitle}
+                            </span>
+                          )}
                         </div>
+                        {citation.section || citation.revision ? (
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {[citation.section, citation.revision]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        ) : null}
                         <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                           {citation.excerpt}
                         </p>

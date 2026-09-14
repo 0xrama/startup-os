@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { signOut } from "@/lib/auth-client";
+import { SecuritySettings } from "@/components/account/security-settings";
 import { Mail, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 
 type AccountPageClientProps = {
@@ -21,9 +22,20 @@ type AccountPageClientProps = {
     email: string;
     image: string | null;
   };
+  security: {
+    hasPassword: boolean;
+    twoFactorEnabled: boolean;
+    passkeys: {
+      id: string;
+      name: string | null;
+      deviceType: string;
+      backedUp: boolean;
+      createdAt: string | null;
+    }[];
+  };
 };
 
-export function AccountPageClient({ user }: AccountPageClientProps) {
+export function AccountPageClient({ user, security }: AccountPageClientProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -92,6 +104,12 @@ export function AccountPageClient({ user }: AccountPageClientProps) {
           </div>
         </div>
       </div>
+
+      <SecuritySettings
+        hasPassword={security.hasPassword}
+        twoFactorEnabled={security.twoFactorEnabled}
+        initialPasskeys={security.passkeys}
+      />
 
       {/* Danger zone */}
       <div className="card-warm border-destructive/20 p-6 sm:p-8">

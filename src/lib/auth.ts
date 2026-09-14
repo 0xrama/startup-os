@@ -1,5 +1,7 @@
+import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
 import * as schema from "./schema";
 
@@ -45,7 +47,21 @@ const trustedOrigins = [
   return isNonEmptyString(value) && values.indexOf(value) === index;
 });
 
+const passkeyOrigin =
+  process.env.PASSKEY_ORIGIN || fallbackAuthUrl || "http://localhost:3000";
+
+const passkeyRpId =
+  process.env.PASSKEY_RP_ID ||
+  (() => {
+    try {
+      return new URL(passkeyOrigin).hostname;
+    } catch {
+      return "localhost";
+    }
+  })();
+
 export const auth = betterAuth({
+  appName: "Pax",
   secret: process.env.BETTER_AUTH_SECRET || undefined,
   baseURL: authBaseUrl,
   trustedOrigins,
@@ -84,6 +100,18 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
   },
+  plugins: [
+    twoFactor({ issuer: "Pax" }),
+    passkey({
+      rpName: "Pax",
+      rpID: passkeyRpId,
+      origin: passkeyOrigin,
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "required",
+      },
+    }),
+  ],
   user: {
     additionalFields: {
       phone: { type: "string", required: false },

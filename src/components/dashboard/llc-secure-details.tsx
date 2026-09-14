@@ -5,17 +5,7 @@ import { Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useEncryption } from "@/components/security/encryption-provider";
 import { decryptJson, type CipherPayload } from "@/lib/e2ee";
-
-type SecurePayload = {
-  ein: string | null;
-  registeredAgent: string | null;
-  members: Array<{
-    name: string;
-    ownershipPct: number;
-    country: string;
-    taxIdType: string;
-  }>;
-};
+import type { SecureLlcPayload } from "@/lib/secure-llc";
 
 export function LlcSecureDetails({
   encryptedData,
@@ -31,11 +21,12 @@ export function LlcSecureDetails({
     ownershipPct: number;
     country: string;
     taxIdType: string;
+    usTaxStatus?: "us_person" | "foreign_person";
   }> | null;
 }) {
   const { masterKey } = useEncryption();
 
-  const [secureData, setSecureData] = useState<SecurePayload | null>(
+  const [secureData, setSecureData] = useState<SecureLlcPayload | null>(
     fallbackEin || fallbackRegisteredAgent || fallbackMembers
       ? {
           ein: fallbackEin,
@@ -50,7 +41,7 @@ export function LlcSecureDetails({
       if (!masterKey || !encryptedData) return;
 
       try {
-        const value = await decryptJson<SecurePayload>(
+        const value = await decryptJson<SecureLlcPayload>(
           masterKey,
           encryptedData
         );
@@ -91,6 +82,13 @@ export function LlcSecureDetails({
                   <p className="font-medium">{member.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {member.country} · {member.taxIdType}
+                    {member.usTaxStatus
+                      ? ` · ${
+                          member.usTaxStatus === "us_person"
+                            ? "U.S. person"
+                            : "Foreign person"
+                        }`
+                      : ""}
                   </p>
                 </div>
                 <Badge variant="secondary">{member.ownershipPct}%</Badge>

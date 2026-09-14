@@ -1,18 +1,29 @@
 import { db } from "./db";
 import { complianceTasks } from "./schema";
 import { buildSeedTaskMetadata } from "./compliance-task-details";
+import { assessOwnershipScope } from "./ownership-scope";
 
 type LLCProfile = {
   id: string;
   state: string;
   entityType: string;
   ownerResidency: string | null;
+  ownersAreIndividuals: boolean | null;
+  ownershipIsDirect: boolean | null;
+  ownerCount: number | null;
+  foreignOwnerCount: number | null;
+  usOwnerCount: number | null;
   taxClassification: string | null;
   einStatus: string | null;
   formationDate: string | null;
   raRenewalDate: string | null;
   annualReportMonth: number | null;
   taxYearEnd: string | null;
+  filingPreferences: {
+    remindDaysBefore: number;
+    channels: ("email" | "whatsapp")[];
+    wyAnnualFeeReminderEnabled?: boolean;
+  } | null;
 };
 
 type TaskSeed = {
@@ -23,18 +34,6 @@ type TaskSeed = {
   recurring: boolean;
   recurrenceRule: string | null;
 };
-
-type AnnualReportWindow = { month: number; label: string };
-
-const ANNUAL_REPORT_STATES = new Map<string, AnnualReportWindow>([
-  ["WY", { month: 0, label: "Due on the 1st day of the anniversary month" }],
-  ["NM", { month: 11, label: "Due within 30 days after anniversary" }],
-  ["FL", { month: 5, label: "Due May 1st annually" }],
-  ["DE", { month: 6, label: "Due June 1st annually" }],
-  ["TX", { month: 5, label: "Due May 15th annually (franchise tax)" }],
-  ["NV", { month: 0, label: "Due on the last day of the anniversary month" }],
-  ["CO", { month: 0, label: "Due in the anniversary month" }],
-]);
 
 function getCurrentTaxYear(): number {
   const now = new Date();
@@ -63,25 +62,16 @@ function getFormationMonth(formationDate: string | null): number {
 export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
   const tasks: TaskSeed[] = [];
   const taxYear = getCurrentTaxYear();
-  const isForeignOwned = llc.ownerResidency === "non_us";
-
-  const isBasicCorporation =
-    llc.entityType === "corporation" || llc.taxClassification === "c-corp";
-
-  const isMultiMemberLlc = llc.entityType === "multi-member";
-  const isSingleMemberLlc = llc.entityType === "single-member";
+  const scope = assessOwnershipScope(llc);
+  const isForeignOwned = (llc.foreignOwnerCount ?? 0) > 0;
 
   // ─── Federal: Form 5472 + pro-forma 1120 ───────────────────
   // Required for foreign-owned disregarded entities
-  if (
-    isForeignOwned &&
-    !isBasicCorporation &&
-    (llc.taxClassification === "disregarded" || isSingleMemberLlc)
-  ) {
+  if (scope.route === "foreign_owned_disregarded_entity") {
     tasks.push({
-      title: `File Form 5472 + pro-forma 1120 (${taxYear})`,
+      title: `Review and file Form 5472 + pro-forma 1120 (${taxYear})`,
       description:
-        "Foreign-owned single-member LLCs must file Form 5472 (Information Return of a 25% Foreign-Owned U.S. Corporation) attached to a pro-forma Form 1120. Reports reportable transactions between the LLC and its foreign owner.",
+        "A foreign-owned U.S. disregarded entity generally files Form 5472 attached to a pro-forma Form 1120 when it had a reportable owner or related-party transaction. Formation, contributions, distributions, loans, and owner-paid expenses can be reportable.",
       category: "federal_tax",
       dueDate: nextDueDate(3, 15), // April 15
       recurring: true,
@@ -90,29 +80,13 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
   }
 
   // ─── Federal: Partnership return (Form 1065) ───────────────
-  if (
-    !isBasicCorporation &&
-    (llc.taxClassification === "partnership" || isMultiMemberLlc)
-  ) {
+  if (scope.route === "partnership") {
     tasks.push({
       title: `File Form 1065 Partnership Return (${taxYear})`,
       description:
         "Multi-member LLCs taxed as partnerships must file Form 1065 and issue Schedule K-1 to each partner.",
       category: "federal_tax",
       dueDate: nextDueDate(2, 15), // March 15
-      recurring: true,
-      recurrenceRule: "YEARLY",
-    });
-  }
-
-  // ─── Federal: Corporate return (Form 1120) ─────────────────
-  if (isBasicCorporation) {
-    tasks.push({
-      title: `File Form 1120 Corporate Return (${taxYear})`,
-      description:
-        "Domestic corporations and entities taxed as C corporations generally file Form 1120 each year. Review whether estimated tax payments, state franchise taxes, or extensions also apply.",
-      category: "federal_tax",
-      dueDate: nextDueDate(3, 15), // April 15 for calendar-year corporations
       recurring: true,
       recurrenceRule: "YEARLY",
     });
@@ -144,19 +118,17 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
     });
   }
 
-  // ─── State: Annual Report ─────────────────────────────────
-  const stateInfo = ANNUAL_REPORT_STATES.get(llc.state);
-
-  if (stateInfo) {
-    const reportMonth =
-      llc.annualReportMonth ??
-      (stateInfo.month === 0
-        ? getFormationMonth(llc.formationDate)
-        : stateInfo.month);
-
+  // ─── Wyoming: annual report and license tax reminder ──────
+  if (
+    llc.state === "WY" &&
+    llc.filingPreferences?.wyAnnualFeeReminderEnabled === true &&
+    llc.formationDate
+  ) {
+    const reportMonth = getFormationMonth(llc.formationDate);
     tasks.push({
-      title: `${llc.state} Annual Report / Franchise Tax`,
-      description: `${stateInfo.label}. File with the ${llc.state} Secretary of State. Failure to file may result in administrative dissolution.`,
+      title: "Wyoming annual report and license tax reminder",
+      description:
+        "Review and pay the Wyoming annual report license tax. It is generally due on the first day of the LLC's anniversary month. Pax provides a reminder only and does not submit the state filing.",
       category: "annual_report",
       dueDate: nextDueDate(reportMonth, 1),
       recurring: true,

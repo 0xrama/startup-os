@@ -5,22 +5,24 @@ import { StaggerContainer, StaggerItem } from "@/components/motion";
 
 const SUGGESTED_PROMPTS = [
   {
-    label: "Upcoming deadlines",
+    label: "LLC wellness check",
     prompt:
-      "What are my next 3 compliance deadlines and what should I prepare now?",
+      "Run the LLC wellness check using my saved activity, documents, tax status, and compliance profile. Tell me what needs action.",
   },
   {
-    label: "Search documents",
+    label: "EIN by fax",
     prompt:
-      "Search my uploaded files for IRS or state notices that need action.",
+      "Explain how I should apply for this LLC's EIN by fax as a non-U.S. owner, including the SS-4 entries and correct fax-number decision.",
   },
   {
-    label: "Form 5472 timeline",
-    prompt: "Explain my Form 5472 timeline in plain English for this LLC.",
+    label: "Federal filing assessment",
+    prompt:
+      "Use my saved LLC profile to tell me which federal return applies, why, the deadline, and what information is still missing.",
   },
   {
-    label: "Monthly checklist",
-    prompt: "Create a simple monthly compliance checklist for this LLC.",
+    label: "Classify owner transactions",
+    prompt:
+      "Help me review owner contributions, distributions, owner-paid expenses, reimbursements, and loans for Form 5472.",
   },
 ] as const;
 

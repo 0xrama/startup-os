@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
+import { z } from "zod";
 import { getChatModel, SYSTEM_PROMPT } from "@/lib/ai";
 import { createAssistantTools } from "@/lib/ai-tools";
 import { seedOfficialKnowledge } from "@/lib/document-intelligence";
@@ -15,8 +16,33 @@ import { incrementMetric } from "@/lib/metrics";
 import { resolveRequestId } from "@/lib/request-context";
 import { searchKnowledgeBase, toCitation } from "@/lib/knowledge";
 import { requireApiContext } from "@/lib/route-guards";
+import { assessFederalTaxFiling } from "@/lib/tax-copilot";
 
 const logger = createLogger("assistant-chat");
+
+const requestSchema = z.object({
+  conversationId: z.string().optional().nullable(),
+  llcId: z.string().optional(),
+  message: z.string().trim().min(1).max(20_000),
+  secureEntityContext: z
+    .object({
+      ein: z.string().max(30).optional().nullable(),
+      registeredAgent: z.string().max(300).optional().nullable(),
+      members: z
+        .array(
+          z.object({
+            name: z.string().max(200),
+            ownershipPct: z.number().min(0).max(100),
+            country: z.string().max(100),
+            taxIdType: z.string().max(100),
+            usTaxStatus: z.enum(["us_person", "foreign_person"]).optional(),
+          })
+        )
+        .max(100)
+        .optional(),
+    })
+    .optional(),
+});
 
 export async function POST(request: NextRequest) {
   const requestId = resolveRequestId(request);
@@ -27,18 +53,19 @@ export async function POST(request: NextRequest) {
     if ("response" in context) return context.response;
     const { session } = context;
 
-    const { conversationId, llcId, message } = await request.json();
+    const parsed = requestSchema.safeParse(await request.json());
 
-    if (!message?.trim()) {
-      return new Response("Message is required", { status: 400 });
+    if (!parsed.success) {
+      return new Response("A valid message and entity context are required", {
+        status: 400,
+      });
     }
 
-    if (llcId) {
-      const llcAccess = await getLlcAccess(session.user.id, llcId);
+    const { conversationId, llcId, message, secureEntityContext } = parsed.data;
+    const llcAccess = llcId ? await getLlcAccess(session.user.id, llcId) : null;
 
-      if (!llcAccess) {
-        return new Response("LLC not found", { status: 404 });
-      }
+    if (llcId && !llcAccess) {
+      return new Response("LLC not found", { status: 404 });
     }
 
     await seedOfficialKnowledge();
@@ -46,14 +73,14 @@ export async function POST(request: NextRequest) {
     const conversation = await ensureConversation({
       userId: session.user.id,
       llcId,
-      conversationId,
+      conversationId: conversationId ?? undefined,
       titleSeed: message,
     });
 
     await createMessage({
       conversationId: conversation.id,
       role: "user",
-      content: message.trim(),
+      content: message,
     });
 
     const history = await getConversationMessages(conversation.id);
@@ -71,7 +98,7 @@ export async function POST(request: NextRequest) {
         })
       : [];
 
-    const citations = retrieval.map(toCitation);
+    const retrievalCitations = retrieval.map(toCitation);
 
     const localRetrievalContext = retrieval.length
       ? `Relevant source-backed context:\n${retrieval
@@ -88,11 +115,47 @@ export async function POST(request: NextRequest) {
       localRetrievalContext ||
       "No source-backed context was retrieved for this message. Be conservative and say when guidance is not source-backed.";
 
-    const tools = createAssistantTools(session.user.id, llcId);
+    const filingAssessment = llcAccess
+      ? assessFederalTaxFiling({
+          ...llcAccess.llc,
+          ein: secureEntityContext?.ein ?? llcAccess.llc.ein,
+          members: secureEntityContext?.members ?? llcAccess.llc.members,
+        })
+      : null;
+
+    const filingContext = filingAssessment
+      ? `Saved-profile federal filing assessment:\n${JSON.stringify(filingAssessment)}\nUse this assessment instead of asking the user to repeat saved profile facts. Clearly distinguish likely filing triggers from confirmed transaction facts.`
+      : "No LLC-specific filing assessment is available.";
+
+    const assessmentCitations =
+      filingAssessment?.sources.map((source) => ({
+        label: source.title,
+        sourceType: "irs" as const,
+        sourceTitle: source.title,
+        excerpt: filingAssessment.summary.slice(0, 240),
+        section: source.section,
+        sourceUrl: source.url,
+        revision: source.revision,
+      })) ?? [];
+
+    const citations = [...retrievalCitations, ...assessmentCitations].filter(
+      (citation, index, all) =>
+        all.findIndex(
+          (candidate) =>
+            candidate.sourceTitle === citation.sourceTitle &&
+            candidate.section === citation.section
+        ) === index
+    );
+
+    const tools = createAssistantTools(
+      session.user.id,
+      llcId,
+      secureEntityContext
+    );
 
     const result = streamText({
       model: await getChatModel(),
-      system: `${SYSTEM_PROMPT}\n\n${finalRetrievalContext}`,
+      system: `${SYSTEM_PROMPT}\n\n${filingContext}\n\n${finalRetrievalContext}`,
       messages: priorMessages,
       tools,
       onFinish: async (event) => {

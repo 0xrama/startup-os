@@ -25,7 +25,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect logged-in users away from auth pages
-  if (pathname === "/login" || pathname === "/signup") {
+  if (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/two-factor"
+  ) {
     const sessionCookie =
       request.cookies.get("better-auth.session_token") ??
       request.cookies.get("__Secure-better-auth.session_token");

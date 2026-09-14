@@ -105,8 +105,35 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
   const [notices, setNotices] = useState<NoticeCase[]>([]);
+  const [noticeActionId, setNoticeActionId] = useState<string | null>(null);
+  const [manualNoticeOpen, setManualNoticeOpen] = useState(false);
+  const [savingManualNotice, setSavingManualNotice] = useState(false);
+
+  const [manualNotice, setManualNotice] = useState({
+    issuer: "",
+    noticeType: "",
+    taxYear: "",
+    responseDueDate: "",
+    summary: "",
+  });
 
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+
+  const fetchNotices = useCallback(async () => {
+    const res = await fetch(`/api/llcs/${llcId}/notices`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) return;
+
+    // SAFETY: the notices endpoint returns NoticeCase rows from the owned
+    // /api/llcs/[id]/notices handler.
+    setNotices((await res.json()) as NoticeCase[]);
+  }, [llcId]);
+
+  useEffect(() => {
+    void fetchNotices().catch(() => undefined);
+  }, [fetchNotices]);
 
   const fetchDocs = useCallback(async () => {
     try {
@@ -172,6 +199,79 @@ export default function DocumentsPage() {
       })
       .catch(() => undefined);
   }, [llcId]);
+
+  async function handleNoticeAction(
+    noticeId: string,
+    action: "confirm" | "dismiss"
+  ) {
+    setNoticeActionId(noticeId);
+
+    try {
+      const res = await fetch(`/api/notices/${noticeId}/${action}`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        setGateMessage(
+          action === "confirm"
+            ? "Could not confirm the notice. Confirm it has a response due date."
+            : "Could not dismiss the notice."
+        );
+
+        return;
+      }
+
+      await fetchNotices();
+    } finally {
+      setNoticeActionId(null);
+    }
+  }
+
+  async function handleManualNoticeSubmit() {
+    if (!manualNotice.issuer.trim()) return;
+
+    setSavingManualNotice(true);
+
+    try {
+      const res = await fetch(`/api/llcs/${llcId}/notices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issuer: manualNotice.issuer.trim(),
+          noticeType: manualNotice.noticeType.trim() || undefined,
+          taxYear: manualNotice.taxYear
+            ? Number(manualNotice.taxYear)
+            : undefined,
+          responseDueDate: manualNotice.responseDueDate || undefined,
+          summary: manualNotice.summary.trim() || undefined,
+        }),
+      });
+
+      // SAFETY: the manual notice POST is validated with a strict Zod schema
+      // server-side; here the shape is only read for an optional error string.
+      const result = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!res.ok) {
+        setGateMessage(result?.error ?? "Could not record the notice.");
+
+        return;
+      }
+
+      setManualNotice({
+        issuer: "",
+        noticeType: "",
+        taxYear: "",
+        responseDueDate: "",
+        summary: "",
+      });
+      setManualNoticeOpen(false);
+      await fetchNotices();
+    } finally {
+      setSavingManualNotice(false);
+    }
+  }
 
   async function handleUpload() {
     if (!selectedFile || !masterKey) return;
@@ -458,45 +558,189 @@ export default function DocumentsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {notices.length > 0 ? (
-            <div className="card-warm p-5">
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="card-warm p-5">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
                 <h2 className="flex items-center gap-2 heading-serif text-xl">
                   <Landmark className="h-5 w-5 text-primary" />
-                  Notice Triage
+                  Notice inbox
                 </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  IRS and state notices extracted from your uploads, plus any
+                  you record by hand. Confirming a notice creates a tracked
+                  response task with reminders.
+                </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManualNoticeOpen((current) => !current)}
+              >
+                {manualNoticeOpen ? "Close form" : "Record notice manually"}
+              </Button>
+            </div>
+
+            {manualNoticeOpen ? (
+              <div className="mb-4 space-y-3 rounded-xl border border-border p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Issuer</Label>
+                    <Input
+                      placeholder="e.g., IRS, Wyoming DOR"
+                      value={manualNotice.issuer}
+                      onChange={(event) =>
+                        setManualNotice((current) => ({
+                          ...current,
+                          issuer: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Notice type or number</Label>
+                    <Input
+                      placeholder="e.g., CP2000"
+                      value={manualNotice.noticeType}
+                      onChange={(event) =>
+                        setManualNotice((current) => ({
+                          ...current,
+                          noticeType: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tax year</Label>
+                    <Input
+                      type="number"
+                      placeholder="2025"
+                      value={manualNotice.taxYear}
+                      onChange={(event) =>
+                        setManualNotice((current) => ({
+                          ...current,
+                          taxYear: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Response due date</Label>
+                    <Input
+                      type="date"
+                      value={manualNotice.responseDueDate}
+                      onChange={(event) =>
+                        setManualNotice((current) => ({
+                          ...current,
+                          responseDueDate: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Summary</Label>
+                  <Input
+                    placeholder="What does the notice ask for?"
+                    value={manualNotice.summary}
+                    onChange={(event) =>
+                      setManualNotice((current) => ({
+                        ...current,
+                        summary: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="btn-warm border-0"
+                  disabled={savingManualNotice || !manualNotice.issuer.trim()}
+                  onClick={() => void handleManualNoticeSubmit()}
+                >
+                  {savingManualNotice ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Save notice
+                </Button>
+              </div>
+            ) : null}
+
+            {notices.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No notices yet. Upload a notice document and Pax will extract
+                the details, or record one manually above.
+              </p>
+            ) : (
               <div className="space-y-3">
-                {notices.map((notice) => (
-                  <div
-                    key={notice.id}
-                    className="rounded-xl border border-border p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium text-sm">
-                          {notice.issuer || "Agency notice"}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {notice.summary || "Waiting for extracted summary."}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="secondary" className="text-xs">
-                          {notice.status}
-                        </Badge>
-                        {notice.responseDueDate ? (
+                {notices.map((notice) => {
+                  const awaitingUser =
+                    notice.status === "processing" || notice.status === "ready";
+
+                  return (
+                    <div
+                      key={notice.id}
+                      className="rounded-xl border border-border p-4"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium text-sm">
+                              {notice.issuer || "Agency notice"}
+                            </p>
+                            <Badge variant="secondary" className="text-xs">
+                              {notice.status === "ready"
+                                ? "Needs your review"
+                                : notice.status}
+                            </Badge>
+                            {notice.riskLevel === "high" ? (
+                              <Badge variant="destructive" className="text-xs">
+                                High risk
+                              </Badge>
+                            ) : null}
+                          </div>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Due {notice.responseDueDate}
+                            {notice.summary || "Waiting for extracted summary."}
                           </p>
+                          {notice.responseDueDate ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Response due {notice.responseDueDate}
+                            </p>
+                          ) : null}
+                        </div>
+                        {awaitingUser ? (
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={noticeActionId === notice.id}
+                              onClick={() =>
+                                void handleNoticeAction(notice.id, "confirm")
+                              }
+                            >
+                              {noticeActionId === notice.id ? (
+                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                              ) : null}
+                              Confirm
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={noticeActionId === notice.id}
+                              onClick={() =>
+                                void handleNoticeAction(notice.id, "dismiss")
+                              }
+                              className="text-muted-foreground"
+                            >
+                              Dismiss
+                            </Button>
+                          </div>
                         ) : null}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-          ) : null}
+            )}
+          </div>
 
           <div className="space-y-2">
             {docs.map((doc) => {

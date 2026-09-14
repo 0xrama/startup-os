@@ -10,6 +10,8 @@ export type Citation = {
   page?: number;
   section?: string;
   documentId?: string;
+  sourceUrl?: string;
+  revision?: string;
 };
 
 export type KnowledgeChunkMetadata = {
@@ -23,6 +25,9 @@ export type KnowledgeChunkMetadata = {
   documentId?: string;
   llcId?: string;
   effectiveDate?: string;
+  sourceUrl?: string;
+  revision?: string;
+  retrievedAt?: string;
 };
 
 export type KnowledgeSearchResult = {
@@ -86,7 +91,18 @@ export async function storeKnowledgeChunks({
     };
   });
 
-  await db.insert(knowledgeChunks).values(values).onConflictDoNothing();
+  await db
+    .insert(knowledgeChunks)
+    .values(values)
+    .onConflictDoUpdate({
+      target: knowledgeChunks.id,
+      set: {
+        source: sql`excluded.source`,
+        sourceId: sql`excluded.source_id`,
+        content: sql`excluded.content`,
+        metadata: sql`excluded.metadata`,
+      },
+    });
 }
 
 export async function deleteKnowledgeChunksBySource(sourceId: string) {
@@ -174,5 +190,7 @@ export function toCitation(item: KnowledgeSearchResult): Citation {
     page: metadata.page,
     section: metadata.section,
     documentId: metadata.documentId,
+    sourceUrl: metadata.sourceUrl,
+    revision: metadata.revision,
   };
 }

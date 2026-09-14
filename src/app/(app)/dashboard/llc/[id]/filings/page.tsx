@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { FileText, CheckCircle2, Clock } from "lucide-react";
 import { requirePageLlcAccess } from "@/lib/access";
+import { TaxCopilotSummary } from "@/components/dashboard/tax-copilot-summary";
+import { FilingPackages } from "@/components/dashboard/filing-packages";
 
 export default async function FilingsPage({
   params,
@@ -54,6 +56,30 @@ export default async function FilingsPage({
           View past and upcoming filings for {llc.name}.
         </p>
       </div>
+
+      <TaxCopilotSummary
+        llcId={id}
+        profile={{
+          id: llc.id,
+          name: llc.name,
+          entityType: llc.entityType,
+          ownerResidency: llc.ownerResidency,
+          ownersAreIndividuals: llc.ownersAreIndividuals,
+          ownershipIsDirect: llc.ownershipIsDirect,
+          ownerCount: llc.ownerCount,
+          foreignOwnerCount: llc.foreignOwnerCount,
+          usOwnerCount: llc.usOwnerCount,
+          taxClassification: llc.taxClassification,
+          taxYearEnd: llc.taxYearEnd,
+          formationDate: llc.formationDate,
+          ein: llc.ein,
+          einStatus: llc.einStatus,
+          members: llc.members,
+        }}
+        encryptedData={llc.encryptedData}
+      />
+
+      <FilingPackages llcId={id} />
 
       {tasks.length === 0 ? (
         <div className="card-warm p-12 text-center border border-dashed border-border group">

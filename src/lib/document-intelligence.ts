@@ -5,8 +5,9 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { getObjectBytes } from "./r2";
-import { documents, knowledgeChunks, noticeCases } from "./schema";
+import { documents, noticeCases } from "./schema";
 import { getChatModel } from "./ai-config";
+import { OFFICIAL_TAX_GUIDANCE } from "./official-tax-guidance";
 import {
   chunkText,
   deleteKnowledgeChunksBySource,
@@ -16,35 +17,6 @@ import {
 declare global {
   var __OFFICIAL_KNOWLEDGE_SYNCED__: boolean | undefined;
 }
-
-const OFFICIAL_KNOWLEDGE_SEED = [
-  {
-    source: "IRS Form 5472 Guidance",
-    sourceId: "irs-form-5472-guidance",
-    chunks: chunkText(
-      "Form 5472 generally applies to 25% foreign-owned U.S. corporations and certain foreign-owned disregarded entities. Penalties begin at $25,000 for failure to file."
-    ),
-    metadata: {
-      kind: "irs" as const,
-      title: "IRS Form 5472 Guidance",
-      form: "Form 5472",
-      section: "Overview",
-    },
-  },
-  {
-    source: "IRS Form 1065 Guidance",
-    sourceId: "irs-form-1065-guidance",
-    chunks: chunkText(
-      "Domestic multi-member LLCs taxed as partnerships generally file Form 1065 by the 15th day of the third month after year end. Schedule K-1 must be provided to each partner."
-    ),
-    metadata: {
-      kind: "irs" as const,
-      title: "IRS Form 1065 Guidance",
-      form: "Form 1065",
-      section: "Deadline",
-    },
-  },
-];
 
 const extractionSchema = z.object({
   documentType: z.string().default("other"),
@@ -285,14 +257,13 @@ export async function seedOfficialKnowledge() {
     return;
   }
 
-  for (const item of OFFICIAL_KNOWLEDGE_SEED) {
-    const existing = await db.query.knowledgeChunks.findFirst({
-      where: eq(knowledgeChunks.sourceId, item.sourceId),
+  for (const item of OFFICIAL_TAX_GUIDANCE) {
+    await storeKnowledgeChunks({
+      source: item.source,
+      sourceId: item.sourceId,
+      chunks: [item.content],
+      metadata: item.metadata,
     });
-
-    if (!existing) {
-      await storeKnowledgeChunks(item);
-    }
   }
 
   globalThis.__OFFICIAL_KNOWLEDGE_SYNCED__ = true;

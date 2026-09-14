@@ -1,0 +1,1 @@
+ALTER TABLE "llcs" ADD COLUMN "wellness_profile" jsonb;

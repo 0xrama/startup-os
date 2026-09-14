@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 type ComposerProps = {
   input: string;
   isLoading: boolean;
+  disabled?: boolean;
   composerRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (value: string) => void;
   onSend: () => void;
@@ -15,6 +16,7 @@ type ComposerProps = {
 export function Composer({
   input,
   isLoading,
+  disabled = false,
   composerRef,
   onChange,
   onSend,
@@ -43,6 +45,7 @@ export function Composer({
             value={input}
             rows={1}
             placeholder="Message Pax Navigator..."
+            disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             className="max-h-[220px] min-h-[48px] resize-none border-0 bg-transparent px-4 py-3 text-[14px] leading-6 shadow-none placeholder:text-muted-foreground/50 focus-visible:ring-0"
@@ -54,7 +57,7 @@ export function Composer({
             <button
               type="button"
               onClick={onSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || disabled}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-30"
             >
               {isLoading ? (

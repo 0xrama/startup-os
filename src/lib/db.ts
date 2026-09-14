@@ -32,6 +32,8 @@ type GlobalWithDb = typeof globalThis & {
   __paxDb?: DbInstance;
 };
 
+// SAFETY: GlobalWithDb only adds an optional cache property to globalThis;
+// all standard global properties retain their existing types.
 const globalWithDb = globalThis as GlobalWithDb;
 
 export function getDb() {

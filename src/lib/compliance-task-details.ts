@@ -99,6 +99,17 @@ function inferTaskMetadata(
     };
   }
 
+  if (lowerTitle.includes("1120-s") || lowerTitle.includes("s-corporation")) {
+    return {
+      filingCode: "1120_s",
+      checklist: checklist([
+        "Confirm the S-corporation election and shareholder eligibility",
+        "Prepare Form 1120-S and shareholder Schedules K-1",
+        "Store the filing acknowledgement",
+      ]),
+    };
+  }
+
   if (lowerTitle.includes("1120")) {
     return {
       filingCode: "1120",

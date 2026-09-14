@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { complianceTasks, documents } from "@/lib/schema";
+import { complianceTasks, documents, noticeCases } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import {
@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { LlcSecureDetails } from "@/components/dashboard/llc-secure-details";
 import { requirePageLlcAccess } from "@/lib/access";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/motion";
+import { LlcWellnessCheck } from "@/components/dashboard/llc-wellness-check";
+import { ComplianceCockpit } from "@/components/dashboard/compliance-cockpit";
+import { OwnershipScopeEditor } from "@/components/dashboard/ownership-scope-editor";
 
 export default async function LLCOverviewPage({
   params,
@@ -31,6 +34,16 @@ export default async function LLCOverviewPage({
     .where(eq(complianceTasks.llcId, id));
 
   const docs = await db.select().from(documents).where(eq(documents.llcId, id));
+
+  const notices = await db
+    .select({
+      id: noticeCases.id,
+      status: noticeCases.status,
+      responseDueDate: noticeCases.responseDueDate,
+      issuer: noticeCases.issuer,
+    })
+    .from(noticeCases)
+    .where(eq(noticeCases.llcId, id));
 
   const pendingTasks = tasks.filter((t) => t.status !== "completed");
 
@@ -87,6 +100,43 @@ export default async function LLCOverviewPage({
         </div>
       </FadeIn>
 
+      {/* Compliance cockpit */}
+      <FadeIn delay={0.02}>
+        <ComplianceCockpit
+          profile={{
+            id: llc.id,
+            name: llc.name,
+            entityType: llc.entityType,
+            ownerResidency: llc.ownerResidency,
+            ownersAreIndividuals: llc.ownersAreIndividuals,
+            ownershipIsDirect: llc.ownershipIsDirect,
+            ownerCount: llc.ownerCount,
+            foreignOwnerCount: llc.foreignOwnerCount,
+            usOwnerCount: llc.usOwnerCount,
+            taxClassification: llc.taxClassification,
+            taxYearEnd: llc.taxYearEnd,
+            formationDate: llc.formationDate,
+            ein: llc.ein,
+            einStatus: llc.einStatus,
+            members: llc.members,
+          }}
+          encryptedData={llc.encryptedData}
+          tasks={tasks.map((task) => ({
+            title: task.title,
+            dueDate: task.dueDate,
+            status: task.status,
+            category: task.category,
+            source: task.source,
+          }))}
+          notices={notices}
+          state={llc.state}
+          formationDate={llc.formationDate}
+          wyAnnualFeeReminderEnabled={
+            llc.filingPreferences?.wyAnnualFeeReminderEnabled
+          }
+        />
+      </FadeIn>
+
       {/* Quick links */}
       <FadeIn delay={0.05}>
         <StaggerContainer className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-10">
@@ -137,12 +187,17 @@ export default async function LLCOverviewPage({
               </div>
               <div>
                 <p className="text-muted-foreground text-xs mb-1">
-                  Founder Residency
+                  Owner Tax Status
                 </p>
                 <p className="font-medium">
-                  {llc.ownerResidency === "us_resident"
-                    ? "U.S. resident"
-                    : "Non-U.S. resident"}
+                  {llc.ownersAreIndividuals !== true ||
+                  llc.ownershipIsDirect !== true
+                    ? "Needs confirmation"
+                    : llc.ownerResidency === "us_resident"
+                      ? "U.S. person"
+                      : llc.ownerResidency === "mixed"
+                        ? "Mixed U.S. and foreign owners"
+                        : "Foreign person"}
                 </p>
               </div>
               <div>
@@ -160,6 +215,18 @@ export default async function LLCOverviewPage({
             </div>
 
             <LlcSecureDetails
+              encryptedData={llc.encryptedData}
+              fallbackEin={llc.ein}
+              fallbackRegisteredAgent={llc.registeredAgent}
+              fallbackMembers={llc.members}
+            />
+            <OwnershipScopeEditor
+              llcId={llc.id}
+              entityType={llc.entityType}
+              taxClassification={llc.taxClassification}
+              ownerResidency={llc.ownerResidency}
+              ownersAreIndividuals={llc.ownersAreIndividuals}
+              ownershipIsDirect={llc.ownershipIsDirect}
               encryptedData={llc.encryptedData}
               fallbackEin={llc.ein}
               fallbackRegisteredAgent={llc.registeredAgent}
@@ -202,6 +269,41 @@ export default async function LLCOverviewPage({
             </div>
           </div>
         </div>
+      </FadeIn>
+
+      <FadeIn delay={0.15}>
+        <LlcWellnessCheck
+          llcId={id}
+          profile={{
+            id: llc.id,
+            name: llc.name,
+            entityType: llc.entityType,
+            ownerResidency: llc.ownerResidency,
+            ownersAreIndividuals: llc.ownersAreIndividuals,
+            ownershipIsDirect: llc.ownershipIsDirect,
+            ownerCount: llc.ownerCount,
+            foreignOwnerCount: llc.foreignOwnerCount,
+            usOwnerCount: llc.usOwnerCount,
+            taxClassification: llc.taxClassification,
+            taxYearEnd: llc.taxYearEnd,
+            formationDate: llc.formationDate,
+            ein: llc.ein,
+            einStatus: llc.einStatus,
+            members: llc.members,
+          }}
+          encryptedData={llc.encryptedData}
+          fallbackRegisteredAgent={llc.registeredAgent}
+          documents={docs.map((document) => ({
+            name: document.name,
+            category: document.category,
+          }))}
+          tasks={tasks.map((task) => ({
+            title: task.title,
+            dueDate: task.dueDate,
+            status: task.status,
+          }))}
+          initialWellness={llc.wellnessProfile}
+        />
       </FadeIn>
     </div>
   );

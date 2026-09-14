@@ -17,6 +17,7 @@ S3-compatible object storage.
 - AI assistant (Form 5472 / pro forma 1120 and Form 1065 guidance) with
   Postgres full-text knowledge retrieval and citations.
 - Audit log and onboarding wizard.
+- Optional authenticator-app two-factor codes, recovery codes, and passkeys.
 
 Not included: billing, plans, multi-tenant teams, or collaborator access. The
 instance holds exactly one account.
@@ -40,20 +41,21 @@ stack. It runs the app, a tuned PostgreSQL instance, and headless MinIO, with a
 combined memory ceiling of about 3 GB (normal idle use is much lower).
 
 ```bash
-docker compose -f docker-compose.local.yml up -d
-docker compose -f docker-compose.local.yml logs -f workspace
+pnpm dev:docker
 ```
 
-Open `http://localhost:3001`. Hot reload works from the host checkout. Enable
-the reminder scheduler only when testing reminders:
+The startup script checks Docker, starts the stack, waits for the health check,
+and opens `http://localhost:3001`. Hot reload works from the host checkout.
+Enable the reminder scheduler only when testing reminders:
 
 ```bash
-docker compose -f docker-compose.local.yml --profile reminders up -d
+pnpm dev:docker -- --reminders
 ```
 
-Stop the stack with `docker compose -f docker-compose.local.yml down`. Add
-`-v` to delete its local database, documents, dependencies, and build cache.
-AI, email, WhatsApp, and Google OAuth still require their provider credentials.
+Use `pnpm dev:docker:logs`, `pnpm dev:docker:status`, and
+`pnpm dev:docker:down` to manage the stack. Run with `--no-open` to skip opening
+the browser. AI, email, WhatsApp, and Google OAuth still require their provider
+credentials.
 
 ## Quick start (local Node)
 
@@ -77,6 +79,7 @@ the in-app **Settings** page (stored in the database).
 | `BETTER_AUTH_SECRET`                                                                  | Yes      | Auth signing secret.                                                                    |
 | `BETTER_AUTH_URL`                                                                     | Yes      | Auth base URL.                                                                          |
 | `NEXT_PUBLIC_APP_URL`                                                                 | Yes      | Public app origin.                                                                      |
+| `PASSKEY_RP_ID` / `PASSKEY_ORIGIN`                                                    | No       | WebAuthn overrides; defaults are derived from the public app URL.                       |
 | `R2_ENDPOINT` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET_NAME`        | Yes      | S3-compatible storage for the vault.                                                    |
 | `R2_PUBLIC_ENDPOINT`                                                                  | No       | Browser-facing storage URL when `R2_ENDPOINT` is only reachable inside Docker.          |
 | `R2_FORCE_PATH_STYLE`                                                                 | MinIO    | Set `true` for path-style endpoints.                                                    |
@@ -88,6 +91,21 @@ the in-app **Settings** page (stored in the database).
 
 Feature flags: `FEATURE_ASSISTANT_RETRIEVAL` (default on) and
 `FEATURE_REQUEST_METRICS` (default on).
+
+### IRS guidance knowledge base
+
+The app automatically seeds a compact, source-linked ruleset for Forms 5472,
+1120, 1065, partnership Schedules K-2/K-3, foreign-partner withholding,
+foreign-payee documentation, and Form SS-4. To load the complete current IRS
+instruction PDFs into the PostgreSQL retrieval index, run this after applying
+database migrations:
+
+```bash
+pnpm knowledge:sync:irs
+```
+
+The sync downloads the official IRS PDFs, replaces the matching versioned
+chunks, and records each source URL, form revision, and retrieval time.
 
 ## Deployment
 
@@ -136,6 +154,7 @@ pnpm deploy:workers      # Deploy to Cloudflare Workers
 pnpm db:generate         # Generate Drizzle migrations
 pnpm db:migrate          # Apply migrations
 pnpm db:studio           # Drizzle Studio
+pnpm knowledge:sync:irs  # Index the full IRS tax and international guidance set
 pnpm typecheck           # tsc --noEmit
 pnpm lint                # ESLint, zero warnings
 pnpm run lint:oxlint     # Oxlint (includes the anti-slop rules)
@@ -160,4 +179,6 @@ pnpm knip                # Unused exports/dependencies
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for issue labels, test layout, and PR
   expectations.
+- Read [docs/product-maturity.md](docs/product-maturity.md) for the current
+  maturity assessment and production roadmap.
 - Health endpoint: `/api/health`; metrics endpoint: `/api/metrics`.

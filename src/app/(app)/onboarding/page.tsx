@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEncryption } from "@/components/security/encryption-provider";
 import { encryptJson } from "@/lib/e2ee";
+import { summarizeOwnerTaxStatuses } from "@/lib/ownership-scope";
 
 const STEPS = [
   { id: "entity", label: "Entity", icon: Building2 },
@@ -52,11 +53,6 @@ const ENTITY_TYPES = [
     label: "Multi-Member LLC",
     desc: "Two or more owners with basic shared operations",
   },
-  {
-    value: "corporation",
-    label: "Basic Corporation",
-    desc: "A simple domestic corporation, not a venture-backed setup",
-  },
 ];
 
 const TAX_CLASSIFICATIONS = [
@@ -70,29 +66,6 @@ const TAX_CLASSIFICATIONS = [
     label: "Partnership",
     desc: "Default for multi-member",
   },
-  {
-    value: "s-corp",
-    label: "S-Corporation",
-    desc: "Basic domestic election via Form 2553",
-  },
-  {
-    value: "c-corp",
-    label: "C-Corporation",
-    desc: "Basic domestic corporation return",
-  },
-];
-
-const OWNER_RESIDENCY_OPTIONS = [
-  {
-    value: "non_us",
-    label: "Founder lives outside the U.S.",
-    desc: "Use this if the owners are generally non-U.S. residents.",
-  },
-  {
-    value: "us_resident",
-    label: "Founder lives in the U.S.",
-    desc: "Supports residents in the U.S., including non-citizens living there.",
-  },
 ];
 
 type MemberEntry = {
@@ -100,6 +73,7 @@ type MemberEntry = {
   ownershipPct: number;
   country: string;
   taxIdType: string;
+  usTaxStatus?: "us_person" | "foreign_person";
 };
 
 type LlcSummary = {
@@ -121,6 +95,8 @@ async function loadEntities() {
 
   if (!response.ok) return [];
 
+  // SAFETY: /api/llcs returns LLC rows with the id, name, state, and entityType
+  // fields selected by LlcSummary.
   return (await response.json()) as LlcSummary[];
 }
 
@@ -134,6 +110,7 @@ async function recoverCreatedEntity({
 
     try {
       const entities = await loadEntities();
+
       const match = entities.find(
         (entity) =>
           entity.name.trim().toLowerCase() === name.trim().toLowerCase() &&
@@ -151,22 +128,13 @@ async function recoverCreatedEntity({
 }
 
 function getTaxClassificationOptions(entityType: string) {
-  if (entityType === "corporation") {
-    return TAX_CLASSIFICATIONS.filter(
-      (option) => option.value === "c-corp" || option.value === "s-corp"
-    );
-  }
-
   if (entityType === "single-member") {
     return TAX_CLASSIFICATIONS.filter(
-      (option) =>
-        option.value === "disregarded" ||
-        option.value === "s-corp" ||
-        option.value === "c-corp"
+      (option) => option.value === "disregarded"
     );
   }
 
-  return TAX_CLASSIFICATIONS.filter((option) => option.value !== "disregarded");
+  return TAX_CLASSIFICATIONS.filter((option) => option.value === "partnership");
 }
 
 export default function OnboardingPage() {
@@ -180,22 +148,33 @@ export default function OnboardingPage() {
   // Form state
   const [name, setName] = useState("");
   const [entityType, setEntityType] = useState("");
-  const [ownerResidency, setOwnerResidency] = useState("non_us");
   const [state, setState] = useState("");
   const [formationDate, setFormationDate] = useState("");
   const [ein, setEin] = useState("");
   const [einStatus, setEinStatus] = useState("pending");
   const [taxClassification, setTaxClassification] = useState("");
-  const [taxYearEnd, setTaxYearEnd] = useState("12-31");
+  const taxYearEnd = "12-31";
   const [registeredAgent, setRegisteredAgent] = useState("");
   const [raRenewalDate, setRaRenewalDate] = useState("");
 
   const [members, setMembers] = useState<MemberEntry[]>([
-    { name: "", ownershipPct: 100, country: "", taxIdType: "foreign" },
+    {
+      name: "",
+      ownershipPct: 100,
+      country: "",
+      taxIdType: "",
+      usTaxStatus: undefined,
+    },
   ]);
+
+  const [ownersAreIndividuals, setOwnersAreIndividuals] = useState(false);
+  const [ownershipIsDirect, setOwnershipIsDirect] = useState(false);
 
   const [remindDaysBefore, setRemindDaysBefore] = useState(30);
   const [channels, setChannels] = useState<string[]>(["email"]);
+
+  const [wyAnnualFeeReminderEnabled, setWyAnnualFeeReminderEnabled] =
+    useState(false);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("add") === "1") return;
@@ -223,7 +202,8 @@ export default function OnboardingPage() {
         name: "",
         ownershipPct: 100,
         country: "",
-        taxIdType: "foreign",
+        taxIdType: "",
+        usTaxStatus: undefined,
       };
 
       if (current.length === 1 && primary.ownershipPct === 100) {
@@ -241,9 +221,7 @@ export default function OnboardingPage() {
 
     if (!entityType || allowed.includes(taxClassification)) return;
 
-    if (entityType === "corporation") {
-      setTaxClassification("c-corp");
-    } else if (entityType === "single-member") {
+    if (entityType === "single-member") {
       setTaxClassification("disregarded");
     } else if (entityType === "multi-member") {
       setTaxClassification("partnership");
@@ -261,7 +239,25 @@ export default function OnboardingPage() {
       case 2:
         return !!taxClassification;
       case 3:
-        return members.every((m) => m.name && m.country);
+        return (
+          ownersAreIndividuals &&
+          ownershipIsDirect &&
+          members.every(
+            (member) =>
+              member.name &&
+              member.country &&
+              member.taxIdType &&
+              member.usTaxStatus &&
+              member.ownershipPct > 0
+          ) &&
+          Math.abs(
+            members.reduce((total, member) => total + member.ownershipPct, 0) -
+              100
+          ) < 0.01 &&
+          (entityType === "single-member"
+            ? members.length === 1
+            : members.length >= 2)
+        );
       case 4:
         return channels.length > 0;
       default:
@@ -272,7 +268,13 @@ export default function OnboardingPage() {
   function addMember() {
     setMembers([
       ...members,
-      { name: "", ownershipPct: 0, country: "", taxIdType: "foreign" },
+      {
+        name: "",
+        ownershipPct: 0,
+        country: "",
+        taxIdType: "",
+        usTaxStatus: undefined,
+      },
     ]);
   }
 
@@ -307,13 +309,28 @@ export default function OnboardingPage() {
           })
         : null;
 
+      const { foreignOwnerCount, usOwnerCount } =
+        summarizeOwnerTaxStatuses(members);
+
+      const ownershipTotal = members.reduce(
+        (total, member) => total + member.ownershipPct,
+        0
+      );
+
       const res = await fetch("/api/llcs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           entityType,
-          ownerResidency,
+          ownersAreIndividuals,
+          ownershipIsDirect,
+          ownershipSummary: {
+            ownerCount: members.length,
+            foreignOwnerCount,
+            usOwnerCount,
+            ownershipTotal,
+          },
           state,
           formationDate: formationDate || null,
           ein: masterKey ? null : ein || null,
@@ -326,12 +343,17 @@ export default function OnboardingPage() {
           filingPreferences: {
             remindDaysBefore,
             channels,
+            wyAnnualFeeReminderEnabled:
+              state === "WY" && wyAnnualFeeReminderEnabled,
           },
           encryptedData,
         }),
       });
 
       const responseText = await res.text();
+
+      // SAFETY: the LLC creation endpoint returns either a created LLC with an
+      // id or a JSON error object, and only those two fields are read here.
       const data = responseText
         ? (JSON.parse(responseText) as { id?: string; error?: string })
         : null;
@@ -424,8 +446,8 @@ export default function OnboardingPage() {
                   What&apos;s your entity called?
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Pax currently supports straightforward LLCs and basic
-                  corporations.
+                  Pax currently supports direct individual ownership in
+                  single-member and multi-member LLCs.
                 </p>
               </div>
               <div className="space-y-6">
@@ -461,33 +483,10 @@ export default function OnboardingPage() {
                     ))}
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <Label>Founder residency</Label>
-                  <div className="grid gap-3">
-                    {OWNER_RESIDENCY_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setOwnerResidency(option.value)}
-                        className={`text-left rounded-lg border p-4 transition-all ${
-                          ownerResidency === option.value
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-border hover:border-primary/40"
-                        }`}
-                      >
-                        <p className="font-medium text-sm">{option.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {option.desc}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <div className="rounded-xl border border-border/70 bg-secondary/40 p-4 text-xs leading-relaxed text-muted-foreground">
-                  Pax is built for straightforward operating companies. If you
-                  are raising venture capital, managing a complex cap table, or
-                  need full tax operations, the flagship product will be a
-                  better fit once it launches.
+                  Companies, trusts, indirect ownership, corporations, and LLC
+                  corporate-tax elections are outside the current supported
+                  scope.
                 </div>
               </div>
             </>
@@ -631,22 +630,18 @@ export default function OnboardingPage() {
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    For a basic corporation, choose C-Corporation unless you
-                    already made an S-Corp election.
-                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tax-year-end">Tax year end</Label>
                   <Input
                     id="tax-year-end"
-                    placeholder="12-31"
                     value={taxYearEnd}
-                    onChange={(e) => setTaxYearEnd(e.target.value)}
+                    readOnly
                     className="h-11 font-mono"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Most LLCs use a calendar year ending 12-31.
+                    The first supported release is limited to calendar-year
+                    entities ending 12-31.
                   </p>
                 </div>
               </div>
@@ -659,21 +654,55 @@ export default function OnboardingPage() {
               <div className="mb-6">
                 <h2 className="heading-serif text-2xl mb-1">Owners</h2>
                 <p className="text-sm text-muted-foreground">
-                  Add the owners of this entity.
+                  Add every direct individual owner and confirm their U.S. tax
+                  status.
                 </p>
               </div>
               <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOwnersAreIndividuals((current) => !current)
+                    }
+                    className={`rounded-lg border p-4 text-left transition-all ${
+                      ownersAreIndividuals
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">
+                      All owners are individuals
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No company, trust, partnership, or other entity is an
+                      owner.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOwnershipIsDirect((current) => !current)}
+                    className={`rounded-lg border p-4 text-left transition-all ${
+                      ownershipIsDirect
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">
+                      All ownership is direct
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Every listed person owns their LLC interest directly.
+                    </p>
+                  </button>
+                </div>
                 {members.map((member, i) => (
                   <div
                     key={i}
                     className="rounded-lg border border-border p-4 space-y-3"
                   >
                     <div className="flex items-center justify-between">
-                      <Badge variant="secondary">
-                        {entityType === "corporation"
-                          ? `Owner ${i + 1}`
-                          : `Member ${i + 1}`}
-                      </Badge>
+                      <Badge variant="secondary">Owner {i + 1}</Badge>
                       {members.length > 1 && (
                         <Button
                           variant="ghost"
@@ -700,7 +729,7 @@ export default function OnboardingPage() {
                         <Label className="text-xs">Ownership %</Label>
                         <Input
                           type="number"
-                          min={0}
+                          min={0.01}
                           max={100}
                           value={member.ownershipPct}
                           onChange={(e) =>
@@ -719,6 +748,38 @@ export default function OnboardingPage() {
                             updateMember(i, { country: e.target.value })
                           }
                         />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">U.S. tax status</Label>
+                        <div className="flex gap-2">
+                          {[
+                            {
+                              value: "foreign_person" as const,
+                              label: "Foreign person",
+                            },
+                            {
+                              value: "us_person" as const,
+                              label: "U.S. person",
+                            },
+                          ].map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() =>
+                                updateMember(i, {
+                                  usTaxStatus: option.value,
+                                })
+                              }
+                              className={`flex-1 rounded-md border px-2 py-2 text-xs ${
+                                member.usTaxStatus === option.value
+                                  ? "border-primary bg-primary/5 font-medium"
+                                  : "border-border"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Tax ID type</Label>
@@ -743,6 +804,11 @@ export default function OnboardingPage() {
                     + Add member
                   </Button>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Ownership must total 100%. Entity owners and indirect
+                  ownership require professional review and are not supported in
+                  this release.
+                </p>
               </div>
             </>
           )}
@@ -811,6 +877,32 @@ export default function OnboardingPage() {
                     </p>
                   ) : null}
                 </div>
+                {state === "WY" ? (
+                  <button
+                    type="button"
+                    disabled={!formationDate}
+                    onClick={() => {
+                      if (!formationDate) return;
+                      setWyAnnualFeeReminderEnabled((current) => !current);
+                    }}
+                    className={`w-full rounded-lg border p-4 text-left transition-all ${
+                      wyAnnualFeeReminderEnabled
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    } ${!formationDate ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    <p className="text-sm font-medium">
+                      Wyoming annual fee reminder
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Remind me to review and pay the Wyoming annual report
+                      license tax. Pax will not submit the state filing.
+                      {!formationDate
+                        ? " Add the formation date before enabling this reminder."
+                        : ""}
+                    </p>
+                  </button>
+                ) : null}
               </div>
             </>
           )}

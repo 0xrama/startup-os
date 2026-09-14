@@ -10,8 +10,18 @@ import {
   searchKnowledgeBase,
   toCitation,
 } from "./knowledge";
+import { assessFederalTaxFiling, classify5472Transaction } from "./tax-copilot";
+import { assessLlcWellness, getEinFaxGuide } from "./llc-wellness";
+import { createOperatingAgreementDraft } from "./operating-agreement";
+import type { SecureLlcPayload } from "./secure-llc";
 
-export function createAssistantTools(userId: string, llcId?: string) {
+type SecureEntityContext = Partial<SecureLlcPayload>;
+
+export function createAssistantTools(
+  userId: string,
+  llcId?: string,
+  secureEntityContext?: SecureEntityContext
+) {
   return {
     getLlcProfile: tool({
       description:
@@ -37,13 +47,20 @@ export function createAssistantTools(userId: string, llcId?: string) {
           state: llc.state,
           entityType: llc.entityType,
           ownerResidency: llc.ownerResidency,
+          ownersAreIndividuals: llc.ownersAreIndividuals,
+          ownershipIsDirect: llc.ownershipIsDirect,
+          ownerCount: llc.ownerCount,
+          foreignOwnerCount: llc.foreignOwnerCount,
+          usOwnerCount: llc.usOwnerCount,
           taxClassification: llc.taxClassification,
           einStatus: llc.einStatus,
           taxYearEnd: llc.taxYearEnd,
           formationDate: llc.formationDate,
           registeredAgent: llc.registeredAgent,
           raRenewalDate: llc.raRenewalDate,
-          members: llc.members,
+          members: secureEntityContext?.members ?? llc.members,
+          ein: secureEntityContext?.ein ?? llc.ein,
+          wellnessProfile: llc.wellnessProfile,
         };
       },
     }),
@@ -186,6 +203,167 @@ export function createAssistantTools(userId: string, llcId?: string) {
       },
     }),
 
+    assessLlcWellness: tool({
+      description:
+        "Run an LLC wellness check using the saved entity profile, operating status, EIN status, operating-agreement documents, banking, bookkeeping, staffing, sales-tax, and other-state activity signals.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!llcId) return { error: "No LLC specified" };
+
+        const access = await getLlcAccess(userId, llcId);
+        const llc = access?.llc;
+
+        if (!llc) return { error: "LLC not found" };
+
+        const [llcDocuments, llcTasks] = await Promise.all([
+          db
+            .select({ name: documents.name, category: documents.category })
+            .from(documents)
+            .where(eq(documents.llcId, llcId)),
+          db
+            .select({
+              title: complianceTasks.title,
+              dueDate: complianceTasks.dueDate,
+              status: complianceTasks.status,
+            })
+            .from(complianceTasks)
+            .where(eq(complianceTasks.llcId, llcId)),
+        ]);
+
+        return assessLlcWellness({
+          profile: {
+            ...llc,
+            ein: secureEntityContext?.ein ?? llc.ein,
+            members: secureEntityContext?.members ?? llc.members,
+          },
+          wellness: llc.wellnessProfile ?? {},
+          documents: llcDocuments,
+          tasks: llcTasks,
+        });
+      },
+    }),
+
+    getEinFaxGuide: tool({
+      description:
+        "Get the current IRS Form SS-4 fax process for an LLC with a non-U.S. owner, including the correct fax-number decision and foreign-owned disregarded-entity line notes.",
+      inputSchema: z.object({
+        principalPlaceOfBusiness: z
+          .enum(["us", "outside_us", "unsure"])
+          .optional(),
+      }),
+      execute: async ({ principalPlaceOfBusiness }) => {
+        if (!llcId) return { error: "No LLC specified" };
+
+        const access = await getLlcAccess(userId, llcId);
+        const llc = access?.llc;
+
+        if (!llc) return { error: "LLC not found" };
+
+        return getEinFaxGuide({
+          profile: {
+            ...llc,
+            ein: secureEntityContext?.ein ?? llc.ein,
+            members: secureEntityContext?.members ?? llc.members,
+          },
+          principalPlaceOfBusiness:
+            principalPlaceOfBusiness ??
+            llc.wellnessProfile?.principalPlaceOfBusiness,
+        });
+      },
+    }),
+
+    draftOperatingAgreement: tool({
+      description:
+        "Create an educational starter operating-agreement draft from the saved LLC and owner profile. The draft must be reviewed for state-specific legal requirements before signing.",
+      inputSchema: z.object({
+        businessPurpose: z.string().max(2_000).optional(),
+      }),
+      execute: async ({ businessPurpose }) => {
+        if (!llcId) return { error: "No LLC specified" };
+
+        const access = await getLlcAccess(userId, llcId);
+        const llc = access?.llc;
+
+        if (!llc) return { error: "LLC not found" };
+
+        return {
+          fileName: `${llc.name}-operating-agreement-draft.md`,
+          draft: createOperatingAgreementDraft({
+            name: llc.name,
+            state: llc.state,
+            formationDate: llc.formationDate,
+            entityType: llc.entityType,
+            taxClassification: llc.taxClassification,
+            registeredAgent:
+              secureEntityContext?.registeredAgent ?? llc.registeredAgent,
+            businessPurpose:
+              businessPurpose ?? llc.wellnessProfile?.businessDescription,
+            members: secureEntityContext?.members ?? llc.members ?? [],
+          }),
+          disclaimer:
+            "Educational starter draft only. Review with a licensed attorney in the formation state before signing.",
+        };
+      },
+    }),
+
+    assessFederalTaxFiling: tool({
+      description:
+        "Assess the LLC's primary federal filing route from the saved entity type, owner tax status, tax classification, tax year, and members. Use this before asking the user to repeat facts already stored in the profile.",
+      inputSchema: z.object({
+        taxYear: z.number().int().min(2017).max(2100).optional(),
+      }),
+      execute: async ({ taxYear }) => {
+        if (!llcId) return { error: "No LLC specified" };
+
+        const access = await getLlcAccess(userId, llcId);
+        const llc = access?.llc;
+
+        if (!llc) return { error: "LLC not found" };
+
+        return assessFederalTaxFiling(
+          {
+            ...llc,
+            ein: secureEntityContext?.ein ?? llc.ein,
+            members: secureEntityContext?.members ?? llc.members,
+          },
+          { taxYear }
+        );
+      },
+    }),
+
+    classify5472Transaction: tool({
+      description:
+        "Classify a possible owner or foreign-related-party transaction into Form 5472 Part IV, V, or VI and suggest a Part IV line when supported. Treat the result as a review aid, not a final tax determination.",
+      inputSchema: z.object({
+        description: z.string().min(3),
+        direction: z.enum(["received", "paid", "unknown"]).default("unknown"),
+      }),
+      execute: async ({ description, direction }) => {
+        if (!llcId) return { error: "No LLC specified" };
+
+        const access = await getLlcAccess(userId, llcId);
+        const llc = access?.llc;
+
+        if (!llc) return { error: "LLC not found" };
+
+        const assessment = assessFederalTaxFiling({
+          ...llc,
+          ein: secureEntityContext?.ein ?? llc.ein,
+          members: secureEntityContext?.members ?? llc.members,
+        });
+
+        if (assessment.route !== "foreign_owned_disregarded_entity") {
+          return {
+            error:
+              "Form 5472 transaction classification is only available for a confirmed supported foreign-owned disregarded entity.",
+            scopeReasons: assessment.reasons,
+          };
+        }
+
+        return classify5472Transaction({ description, direction });
+      },
+    }),
+
     getFilingInstructions: tool({
       description:
         "Get filing instructions and guidance for a specific form or compliance task. Returns general instructions based on the form type.",
@@ -210,19 +388,17 @@ export function createAssistantTools(userId: string, llcId?: string) {
         const instructions = {
           "Form 1120": {
             overview:
-              "Form 1120 is the U.S. Corporation Income Tax Return for domestic corporations and certain entities that elected to be taxed as corporations. It is not the default annual return for every LLC.",
+              "Pax supports Form 1120 only as the limited pro forma cover return attached to Form 5472 for a supported foreign-owned U.S. disregarded entity. Normal corporation returns and LLC corporate-tax elections are outside the supported scope.",
             steps: [
-              "Confirm the entity's federal tax classification first: C corporation, S corporation, partnership, disregarded entity, or LLC that elected corporate treatment on Form 8832.",
-              "If the entity is a domestic corporation or an LLC taxed as a corporation, prepare Form 1120 and any required schedules.",
-              "File by the 15th day of the 4th month after the tax year ends, unless the corporation has a June 30 year end, which uses the 15th day of the 3rd month.",
-              "If more time is needed to file, submit Form 7004 by the original due date. The extension does not extend time to pay tax due.",
-              "Pay any balance due electronically and review whether estimated tax payments, Form 2220, Schedule M-3, Form 5472, or Form 8832 are also required.",
+              "Confirm that the saved filing assessment is the foreign-owned disregarded-entity Form 5472 route.",
+              "Prepare the limited pro forma Form 1120 fields required by the current Form 5472 instructions.",
+              "Attach the completed Form 5472 and any required statements.",
+              "Download and review the draft before following the current IRS filing instructions. Pax does not transmit the filing.",
             ],
             tips: [
-              "A multi-member LLC usually files Form 1065 unless it elected corporate tax treatment.",
-              "A foreign-owned domestic disregarded entity often files Form 5472 with a pro forma Form 1120 instead of a regular corporate income tax return.",
-              "Corporations that expect total tax of $500 or more generally need estimated tax installments.",
-              "For returns required to be filed in 2026, the minimum late-filing penalty can be the smaller of the tax due or $525 if the return is more than 60 days late.",
+              "Do not use this workflow for a normal Form 1120 corporation return.",
+              "A foreign-owned domestic disregarded entity may need Form 5472 even when it had no income if it had reportable transactions.",
+              "Keep proof of the filing method used outside Pax.",
             ],
           },
           "Form 5472": {
@@ -251,7 +427,7 @@ export function createAssistantTools(userId: string, llcId?: string) {
               "Complete Form 1065 and prepare a separate Schedule K-1 for each person who was a partner during the year.",
               "File by the 15th day of the 3rd month after the tax year ends. For a 2025 calendar-year partnership, the due date is March 16, 2026.",
               "If more time is needed, file Form 7004 by the original due date. Form 7004 for Form 1065 can be electronically filed.",
-              "If the partnership is subject to mandatory e-filing, submit Form 1065, K-1s, and related forms through an IRS-authorized e-file provider or compatible business tax software using the Modernized e-File system.",
+              "Download and review the draft package, then follow the current IRS filing instructions or use an outside tax professional or filing provider. Pax does not transmit the return.",
             ],
             tips: [
               "Beginning in 2024, partnerships generally must e-file if they file 10 or more returns of any type during the year, and partnerships with more than 100 partners must e-file.",
@@ -276,18 +452,18 @@ export function createAssistantTools(userId: string, llcId?: string) {
             ],
           },
           "Annual Report": {
-            overview: `Annual report / franchise tax filing required by the state of formation.${state ? ` For ${state}, check the Secretary of State website for current fees and forms.` : ""}`,
+            overview:
+              state === "WY"
+                ? "Pax can remind a Wyoming LLC to review and pay its annual report license tax. Pax does not prepare or submit the state filing."
+                : "State annual-report automation is outside Pax's current supported scope. Check the formation state's official website or consult a qualified professional.",
             steps: [
-              "Check your state's Secretary of State website for the current form",
-              "Update registered agent information if changed",
-              "Pay the required filing fee",
-              "File online through the state portal if available",
+              "For a Wyoming LLC, check the Wyoming Secretary of State website for the current report and fee.",
+              "Review the entity and registered-agent information.",
+              "Pay and submit directly through the official state process.",
             ],
             tips: [
-              "Missing the annual report can lead to administrative dissolution",
-              "Most states allow online filing",
-              "Wyoming annual report fee is based on assets in the state (minimum $60)",
-              "Some states (like New Mexico) do not require annual reports",
+              "The reminder is optional and is not proof that the state filing was completed.",
+              "Verify the current due date and fee with Wyoming before submitting.",
             ],
           },
           "BOI Report": {
