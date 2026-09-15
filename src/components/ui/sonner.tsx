@@ -1,6 +1,5 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
   CircleCheckIcon,
@@ -11,13 +10,11 @@ import {
 } from "lucide-react";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      // SAFETY: next-themes is configured with light/dark/system only, so the
-      // string it returns is always one of Sonner's accepted theme literals.
-      theme={theme as ToasterProps["theme"]}
+      // The app ships one light theme (see globals.css), so toasts must not
+      // follow the OS color scheme.
+      theme="light"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

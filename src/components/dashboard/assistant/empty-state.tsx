@@ -6,21 +6,25 @@ import { StaggerContainer, StaggerItem } from "@/components/motion";
 const SUGGESTED_PROMPTS = [
   {
     label: "LLC wellness check",
+    hint: "What needs action across activity, documents, and deadlines",
     prompt:
       "Run the LLC wellness check using my saved activity, documents, tax status, and compliance profile. Tell me what needs action.",
   },
   {
     label: "EIN by fax",
+    hint: "SS-4 entries and the right fax number for a non-U.S. owner",
     prompt:
       "Explain how I should apply for this LLC's EIN by fax as a non-U.S. owner, including the SS-4 entries and correct fax-number decision.",
   },
   {
     label: "Federal filing assessment",
+    hint: "Which return applies, when it is due, and what is missing",
     prompt:
       "Use my saved LLC profile to tell me which federal return applies, why, the deadline, and what information is still missing.",
   },
   {
     label: "Classify owner transactions",
+    hint: "Contributions, distributions, and loans for Form 5472",
     prompt:
       "Help me review owner contributions, distributions, owner-paid expenses, reimbursements, and loans for Form 5472.",
   },
@@ -65,7 +69,7 @@ export function EmptyState({ composerRef, onSelectPrompt }: EmptyStateProps) {
                   {item.label}
                 </span>
                 <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                  {item.prompt}
+                  {item.hint}
                 </span>
               </button>
             </StaggerItem>

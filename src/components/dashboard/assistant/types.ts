@@ -10,11 +10,19 @@ export type Citation = {
   revision?: string;
 };
 
+export type ToolActivity = {
+  id: string;
+  name: string;
+  status: "running" | "done";
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   citations?: Citation[] | null;
+  // Present only on the optimistic assistant turn while it streams.
+  activity?: ToolActivity[];
 };
 
 export type Conversation = {

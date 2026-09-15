@@ -4,6 +4,31 @@ import { chatConversations, chatMessages } from "./schema";
 import type { Citation } from "./knowledge";
 import { AI_MAX_HISTORY_MESSAGES } from "./ai-limits";
 
+export const CONVERSATION_TITLE_MAX_CHARS = 80;
+
+// The first user turn seeds the sidebar title until a generated title replaces
+// it. Cut on a word boundary so the sidebar shows a phrase, not a fragment.
+export function deriveTitleSeed(text: string, maxChars = 60) {
+  const firstLine = text.split("\n").find((line) => line.trim()) ?? "";
+  const collapsed = firstLine.replace(/\s+/g, " ").trim();
+
+  if (collapsed.length <= maxChars) return collapsed || "New conversation";
+
+  const cut = collapsed.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+
+  return `${lastSpace > maxChars / 2 ? cut.slice(0, lastSpace) : cut}…`;
+}
+
+export function normalizeConversationTitle(title: string) {
+  return title
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^["'“”]+|["'“”.]+$/g, "")
+    .slice(0, CONVERSATION_TITLE_MAX_CHARS)
+    .trim();
+}
+
 export async function getConversationContext(conversationId: string) {
   const messages = await db
     .select({ role: chatMessages.role, content: chatMessages.content })
@@ -104,12 +129,53 @@ export async function ensureConversation({
     .values({
       userId,
       llcId: llcId ?? null,
-      title: titleSeed?.slice(0, 80) ?? "New conversation",
+      title: deriveTitleSeed(titleSeed ?? ""),
       lastMessageAt: new Date(),
     })
     .returning();
 
   return conversation;
+}
+
+export async function renameConversation(
+  userId: string,
+  conversationId: string,
+  title: string
+) {
+  const normalized = normalizeConversationTitle(title);
+
+  if (!normalized) return null;
+
+  const [conversation] = await db
+    .update(chatConversations)
+    .set({ title: normalized, updatedAt: new Date() })
+    .where(
+      and(
+        eq(chatConversations.id, conversationId),
+        eq(chatConversations.userId, userId)
+      )
+    )
+    .returning();
+
+  return conversation ?? null;
+}
+
+// Messages cascade from the conversation row (see chat_messages FK).
+export async function deleteConversation(
+  userId: string,
+  conversationId: string
+) {
+  const deleted = await db
+    .delete(chatConversations)
+    .where(
+      and(
+        eq(chatConversations.id, conversationId),
+        eq(chatConversations.userId, userId)
+      )
+    )
+    .returning({ id: chatConversations.id });
+
+  return deleted.length > 0;
 }
 
 export async function createMessage({
@@ -155,7 +221,7 @@ export async function createMessage({
       updatedAt: new Date(),
       title:
         role === "user" && content
-          ? sql`coalesce(nullif(${chatConversations.title}, ''), ${content.slice(0, 80)})`
+          ? sql`coalesce(nullif(${chatConversations.title}, ''), ${deriveTitleSeed(content)})`
           : undefined,
     })
     .where(eq(chatConversations.id, conversationId));

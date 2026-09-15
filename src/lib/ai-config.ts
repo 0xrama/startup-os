@@ -10,7 +10,7 @@ import {
 
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 
-const DEFAULT_AI_MODEL = "gpt-4o";
+const DEFAULT_AI_MODEL = "gpt-5.6-luna";
 
 const SINGLETON_ID = "singleton";
 

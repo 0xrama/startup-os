@@ -20,6 +20,7 @@ export function OperationsPanel() {
   const [status, setStatus] = useState<z.infer<typeof statusSchema> | null>(
     null
   );
+
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {

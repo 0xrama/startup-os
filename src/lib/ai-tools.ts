@@ -15,14 +15,21 @@ import { assessLlcWellness, getEinFaxGuide } from "./llc-wellness";
 import { createOperatingAgreementDraft } from "./operating-agreement";
 import type { SecureLlcPayload } from "./secure-llc";
 import { seedOfficialKnowledge } from "./official-knowledge";
+import type { Citation } from "./knowledge";
 
 type SecureEntityContext = Partial<SecureLlcPayload>;
+
+type AssistantToolOptions = {
+  // Registers a source the model may cite and returns its marker, e.g. "[3]".
+  registerCitation?: (citation: Citation) => string;
+};
 
 export function createAssistantTools(
   userId: string,
   llcId?: string,
   secureEntityContext?: SecureEntityContext,
-  initialAccess?: Awaited<ReturnType<typeof getLlcAccess>>
+  initialAccess?: Awaited<ReturnType<typeof getLlcAccess>>,
+  options: AssistantToolOptions = {}
 ) {
   // Tool calls in one answer often ask for the same profile.
   const accessById = new Map<string, ReturnType<typeof getLlcAccess>>();
@@ -247,12 +254,20 @@ export function createAssistantTools(
         });
 
         return {
-          results: results.map((result) => ({
-            content: result.content,
-            source: result.source,
-            metadata: result.metadata,
-            citation: toCitation(result),
-          })),
+          results: results.map((result) => {
+            const citation = toCitation(result);
+
+            return {
+              ref: options.registerCitation?.(citation),
+              content: result.content,
+              source: result.source,
+              metadata: result.metadata,
+              citation,
+            };
+          }),
+          instructions: options.registerCitation
+            ? "Cite a result inline with its ref marker when you rely on it."
+            : undefined,
         };
       },
     }),

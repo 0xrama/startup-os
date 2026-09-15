@@ -60,10 +60,12 @@ export function generateComplianceTasks(
   now = new Date()
 ): TaskSeed[] {
   const tasks: TaskSeed[] = [];
+
   const taxYear = Math.max(
     currentFilingTaxYear(now),
     Number(llc.formationDate?.slice(0, 4)) || 0
   );
+
   const scope = assessFederalTaxFiling({ ...llc, name: "" }, { taxYear });
 
   // ─── Federal: Form 5472 + pro-forma 1120 ───────────────────

@@ -34,6 +34,7 @@ try {
     toolUsed &&
     result.text.includes("2026-04-15") &&
     result.text.includes("synthetic-source-1");
+
   console.log(
     JSON.stringify({
       evaluation: "tool-followup-with-source",

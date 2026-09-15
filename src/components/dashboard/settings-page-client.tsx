@@ -145,7 +145,7 @@ export function SettingsPageClient() {
                 id="ai-model"
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                placeholder="gpt-4o"
+                placeholder="gpt-5.6-luna"
                 autoComplete="off"
               />
               <p className="text-[11px] text-muted-foreground">

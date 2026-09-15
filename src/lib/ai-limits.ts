@@ -2,7 +2,7 @@ export const AI_MAX_HISTORY_MESSAGES = 24;
 
 export const AI_MAX_HISTORY_CHARS = 32_000;
 
-export const AI_MAX_OUTPUT_TOKENS = 4_096;
+export const AI_MAX_OUTPUT_TOKENS = 128_000;
 
 export const AI_MAX_STEPS = 5;
 

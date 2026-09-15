@@ -6,13 +6,20 @@ import { PanelLeft } from "lucide-react";
 import { Composer } from "@/components/dashboard/assistant/composer";
 import { EmptyState } from "@/components/dashboard/assistant/empty-state";
 import { MessageList } from "@/components/dashboard/assistant/message-list";
+import { StatusBanner } from "@/components/dashboard/assistant/status-banner";
 import { ThreadSidebar } from "@/components/dashboard/assistant/thread-sidebar";
 import type {
   Citation,
   Conversation,
   Message,
+  ToolActivity,
 } from "@/components/dashboard/assistant/types";
 import { useEncryption } from "@/components/security/encryption-provider";
+import {
+  createAssistantEventParser,
+  type AssistantFinishReason,
+  type AssistantStreamEvent,
+} from "@/lib/assistant-stream";
 import { decryptJson, type CipherPayload } from "@/lib/e2ee";
 import type { SecureLlcPayload } from "@/lib/secure-llc";
 
@@ -27,6 +34,142 @@ const SECURE_CONTEXT_MESSAGES = {
   error: "The entity profile could not be loaded. Refresh and try again.",
   loading: "Wait for the entity profile to finish loading.",
 };
+
+const CONTINUE_PROMPT = "Continue from where you stopped.";
+
+type SendOptions =
+  // A fresh user turn typed in the composer or chosen from a suggestion.
+  | { kind: "message"; text: string }
+  // Re-answer the last saved user turn; the server adds no new user message.
+  | { kind: "regenerate" };
+
+function updateActivity(
+  current: ToolActivity[] | undefined,
+  step: ToolActivity
+) {
+  const list = current ?? [];
+
+  return list.some((item) => item.id === step.id)
+    ? list.map((item) => (item.id === step.id ? step : item))
+    : [...list, step];
+}
+
+type StreamSnapshot = {
+  content: string;
+  activity: ToolActivity[] | undefined;
+};
+
+type StreamResult = StreamSnapshot & {
+  finishReason: AssistantFinishReason | null;
+  title: string | null;
+  error: string | null;
+};
+
+// Consumes the NDJSON answer. Snapshots are delivered at most once per
+// animation frame so a fast stream does not schedule a render per event.
+async function readAssistantStream(
+  body: ReadableStream<Uint8Array>,
+  onSnapshot: (snapshot: StreamSnapshot) => void
+): Promise<StreamResult> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const parser = createAssistantEventParser();
+
+  const result: StreamResult = {
+    content: "",
+    activity: undefined,
+    finishReason: null,
+    title: null,
+    error: null,
+  };
+
+  let frame: number | null = null;
+
+  const flush = () => {
+    frame = null;
+    onSnapshot({ content: result.content, activity: result.activity });
+  };
+
+  const apply = (event: AssistantStreamEvent) => {
+    switch (event.type) {
+      case "text":
+        result.content += event.text;
+        break;
+      case "tool":
+        result.activity = updateActivity(result.activity, {
+          id: event.id,
+          name: event.name,
+          status: event.status,
+        });
+        break;
+      case "finish":
+        result.finishReason = event.finishReason;
+        break;
+      case "title":
+        result.title = event.title;
+        break;
+      case "error":
+        result.error = event.message;
+        break;
+      default:
+        break;
+    }
+
+    if (frame === null) frame = requestAnimationFrame(flush);
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      for (const event of parser.push(decoder.decode(value, { stream: true })))
+        apply(event);
+    }
+
+    for (const event of parser.push(decoder.decode())) apply(event);
+
+    for (const event of parser.flush()) apply(event);
+  } finally {
+    if (frame !== null) cancelAnimationFrame(frame);
+  }
+
+  flush();
+
+  return result;
+}
+
+// A regenerate replaces an unsaved partial answer left by Stop; a fresh turn
+// appends both the user message and an empty assistant placeholder.
+function buildOptimisticMessages(
+  prev: Message[],
+  options: {
+    regenerate: boolean;
+    trimmedInput: string;
+    userId: string;
+    assistantId: string;
+  }
+): Message[] {
+  const { regenerate, trimmedInput, userId, assistantId } = options;
+
+  const base =
+    regenerate && prev.at(-1)?.role === "assistant" ? prev.slice(0, -1) : prev;
+
+  return [
+    ...base,
+    ...(regenerate
+      ? []
+      : [
+          {
+            id: userId,
+            role: "user" as const,
+            content: trimmedInput,
+          },
+        ]),
+    { id: assistantId, role: "assistant" as const, content: "" },
+  ];
+}
 
 export default function AssistantPage() {
   const { id: llcId } = useParams<{ id: string }>();
@@ -51,13 +194,23 @@ export default function AssistantPage() {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [messageError, setMessageError] = useState<string | null>(null);
+  // True when the failed turn was saved server-side, so Retry can regenerate.
+  const [canRetry, setCanRetry] = useState(false);
+  const [truncated, setTruncated] = useState(false);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const streamController = useRef<AbortController | null>(null);
   const threadController = useRef<AbortController | null>(null);
   const navigationVersion = useRef(0);
+
+  // A 260px thread rail leaves no usable chat column on a phone, so it starts
+  // closed and only opens by default where there is room for both.
+  useEffect(() => {
+    setSidebarOpen(window.matchMedia("(min-width: 768px)").matches);
+  }, []);
 
   useEffect(
     () => () => {
@@ -95,7 +248,10 @@ export default function AssistantPage() {
       setIsLoading(false);
       setLoadingMessages(true);
       setMessageError(null);
+      setCanRetry(false);
+      setTruncated(false);
       setGateMessage(null);
+      setNotice(null);
 
       try {
         const res = await fetch(`/api/assistant/conversations/${id}`, {
@@ -247,7 +403,39 @@ export default function AssistantPage() {
     };
   }, [encryptionLoading, llcId, masterKey]);
 
+  // The provider never persists a partial answer when the request aborts, so
+  // the stopped text stays on screen only until the thread is reloaded.
+  function stopGenerating() {
+    if (!streamController.current) return;
+    streamController.current.abort();
+    streamController.current = null;
+    setIsLoading(false);
+
+    setMessages((current) => {
+      const last = current.at(-1);
+
+      if (last?.role === "assistant" && last.content === "") {
+        return current.slice(0, -1);
+      }
+
+      return current;
+    });
+
+    setNotice(
+      "Generation stopped. Anything already shown is not saved to this thread."
+    );
+    setCanRetry(true);
+    // The user turn was saved before streaming began, so a thread started by
+    // this message still belongs in the sidebar.
+    void loadConversations();
+  }
+
+  function closeSidebarOnNarrowScreen() {
+    if (!window.matchMedia("(min-width: 768px)").matches) setSidebarOpen(false);
+  }
+
   function startNewConversation() {
+    closeSidebarOnNarrowScreen();
     navigationVersion.current += 1;
     streamController.current?.abort();
     threadController.current?.abort();
@@ -257,9 +445,64 @@ export default function AssistantPage() {
     setConversationId(null);
     setMessages([]);
     setMessageError(null);
+    setCanRetry(false);
+    setTruncated(false);
     setGateMessage(null);
+    setNotice(null);
     setInput("");
     requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  async function renameConversation(id: string, title: string) {
+    const response = await fetch(`/api/assistant/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Could not rename the thread." }));
+
+      setThreadError(error.error ?? "Could not rename the thread.");
+
+      return;
+    }
+
+    // SAFETY: PATCH /api/assistant/conversations/[id] returns the updated
+    // Conversation row it just wrote.
+    const updated = (await response.json()) as Conversation;
+
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === id
+          ? { ...conversation, title: updated.title }
+          : conversation
+      )
+    );
+  }
+
+  async function deleteConversation(id: string) {
+    const response = await fetch(`/api/assistant/conversations/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Could not delete the thread." }));
+
+      setThreadError(error.error ?? "Could not delete the thread.");
+
+      return;
+    }
+
+    setConversations((current) =>
+      current.filter((conversation) => conversation.id !== id)
+    );
+
+    if (conversationId === id) startNewConversation();
   }
 
   async function loadOlderMessages() {
@@ -319,14 +562,81 @@ export default function AssistantPage() {
     ]);
   }
 
-  async function handleSend() {
+  // Throws on a failed or empty answer so the turn rolls back; otherwise
+  // surfaces truncation and applies any generated thread title.
+  function applyAnswerResult(answer: StreamResult, nextId: string | null) {
+    if (answer.error) throw new Error(answer.error);
+
+    if (!answer.content.trim())
+      throw new Error(
+        "The AI provider returned no answer. Check Settings and retry."
+      );
+
+    if (answer.finishReason === "length") setTruncated(true);
+
+    if (answer.title && nextId) {
+      const { title } = answer;
+
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === nextId ? { ...conversation, title } : conversation
+        )
+      );
+    }
+  }
+
+  // Rolls back optimistic messages after a failed turn. When the turn never
+  // reached the server the draft is handed back; when it did, the saved user
+  // message stays and a regenerate can retry it.
+  function rollbackFailedTurn(options: {
+    regenerate: boolean;
+    trimmedInput: string;
+    acceptedByServer: boolean;
+    optimisticUserId: string;
+    optimisticAssistantId: string;
+  }) {
+    const {
+      regenerate,
+      trimmedInput,
+      acceptedByServer,
+      optimisticUserId,
+      optimisticAssistantId,
+    } = options;
+
+    if (!acceptedByServer) {
+      setMessages((prev) =>
+        prev.filter(
+          (message) =>
+            message.id !== optimisticUserId &&
+            message.id !== optimisticAssistantId
+        )
+      );
+
+      if (!regenerate) setInput((current) => current || trimmedInput);
+    } else {
+      setMessages((prev) =>
+        prev.filter((message) => message.id !== optimisticAssistantId)
+      );
+
+      setCanRetry(true);
+    }
+  }
+
+  async function handleSend(options: SendOptions) {
     if (secureContextStatus !== "ready") {
       setGateMessage(SECURE_CONTEXT_MESSAGES[secureContextStatus]);
 
       return;
     }
 
-    if (!input.trim() || isLoading || loadingMessages) return;
+    if (isLoading || loadingMessages) return;
+
+    const regenerate = options.kind === "regenerate";
+    const trimmedInput = options.kind === "message" ? options.text.trim() : "";
+
+    if (options.kind === "message" && !trimmedInput) return;
+
+    if (regenerate && !conversationId) return;
 
     const controller = new AbortController();
     streamController.current = controller;
@@ -335,21 +645,25 @@ export default function AssistantPage() {
     const isCurrent = () =>
       !controller.signal.aborted && version === navigationVersion.current;
 
-    let frame: number | null = null;
-
     setGateMessage(null);
     setMessageError(null);
+    setCanRetry(false);
+    setTruncated(false);
+    setNotice(null);
 
-    const trimmedInput = input.trim();
     const optimisticUserId = crypto.randomUUID();
     const optimisticAssistantId = crypto.randomUUID();
 
-    setMessages((prev) => [
-      ...prev,
-      { id: optimisticUserId, role: "user", content: trimmedInput },
-      { id: optimisticAssistantId, role: "assistant", content: "" },
-    ]);
-    setInput("");
+    setMessages((prev) =>
+      buildOptimisticMessages(prev, {
+        regenerate,
+        trimmedInput,
+        userId: optimisticUserId,
+        assistantId: optimisticAssistantId,
+      })
+    );
+
+    if (!regenerate) setInput("");
     setIsLoading(true);
 
     let acceptedByServer = false;
@@ -364,7 +678,8 @@ export default function AssistantPage() {
         body: JSON.stringify({
           conversationId,
           llcId,
-          message: trimmedInput,
+          message: regenerate ? undefined : trimmedInput,
+          regenerate: regenerate || undefined,
           secureEntityContext,
         }),
       });
@@ -384,47 +699,23 @@ export default function AssistantPage() {
 
       setConversationId(nextConversationId);
 
-      const reader = res.body?.getReader();
-
-      if (!reader) {
+      if (!res.body) {
         throw new Error("No response stream available");
       }
 
-      const decoder = new TextDecoder();
-      let assistantContent = "";
-
-      const flush = () => {
-        frame = null;
-
+      const answer = await readAssistantStream(res.body, (snapshot) => {
         if (!isCurrent()) return;
-        const content = assistantContent;
         setMessages((prev) =>
           prev.map((message) =>
             message.id === optimisticAssistantId
-              ? { ...message, content }
+              ? { ...message, ...snapshot }
               : message
           )
         );
-      };
+      });
 
-      while (true) {
-        const { done, value } = await reader.read();
+      applyAnswerResult(answer, nextConversationId);
 
-        if (done) break;
-        assistantContent += decoder.decode(value, { stream: true });
-
-        if (frame === null) frame = requestAnimationFrame(flush);
-      }
-
-      assistantContent += decoder.decode();
-
-      if (frame !== null) cancelAnimationFrame(frame);
-      flush();
-
-      if (!assistantContent.trim())
-        throw new Error(
-          "The AI provider returned no answer. Check Settings and retry."
-        );
       await loadConversations();
 
       if (isCurrent() && nextConversationId)
@@ -441,24 +732,16 @@ export default function AssistantPage() {
           ? error.message
           : "Sorry, something went wrong. Please try again.";
 
-      if (!acceptedByServer) {
-        setMessages((prev) =>
-          prev.filter(
-            (message) =>
-              message.id !== optimisticUserId &&
-              message.id !== optimisticAssistantId
-          )
-        );
-      } else {
-        setMessages((prev) =>
-          prev.filter((message) => message.id !== optimisticAssistantId)
-        );
-      }
+      rollbackFailedTurn({
+        regenerate,
+        trimmedInput,
+        acceptedByServer,
+        optimisticUserId,
+        optimisticAssistantId,
+      });
 
       setMessageError(gateMessageText ?? fallbackMessage);
     } finally {
-      if (frame !== null) cancelAnimationFrame(frame);
-
       if (isCurrent()) setIsLoading(false);
 
       if (streamController.current === controller)
@@ -472,7 +755,7 @@ export default function AssistantPage() {
     <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <div>
-          <p className="text-sm font-medium">AI Copilot</p>
+          <p className="text-sm font-medium">Pax Navigator</p>
           <p className="text-[11px] text-muted-foreground">
             Informational guidance and draft preparation, not professional tax
             advice.
@@ -480,7 +763,7 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* ─── Thread Sidebar ─────────────────────────────────────── */}
         <ThreadSidebar
           conversations={conversations}
@@ -488,10 +771,15 @@ export default function AssistantPage() {
           loadingThreads={loadingThreads}
           threadError={threadError}
           sidebarOpen={sidebarOpen}
-          onSelectConversation={(id) => void selectConversation(id)}
+          onSelectConversation={(id) => {
+            closeSidebarOnNarrowScreen();
+            void selectConversation(id);
+          }}
           onNewConversation={startNewConversation}
           onCloseSidebar={() => setSidebarOpen(false)}
           onRetryThreads={() => void loadConversations()}
+          onRenameConversation={renameConversation}
+          onDeleteConversation={deleteConversation}
         />
 
         {/* ─── Main Chat Area ─────────────────────────────────────── */}
@@ -503,6 +791,7 @@ export default function AssistantPage() {
               onClick={() => setSidebarOpen(true)}
               className="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               title="Open sidebar"
+              aria-label="Open thread list"
             >
               <PanelLeft className="h-4 w-4" />
             </button>
@@ -510,44 +799,68 @@ export default function AssistantPage() {
 
           {/* Alerts */}
           {gateMessage ? (
-            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-                {gateMessage}
-              </div>
-            </div>
+            <StatusBanner tone="warning">{gateMessage}</StatusBanner>
           ) : null}
 
           {messageError ? (
-            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-xs text-destructive">
-                {messageError}
-              </div>
-            </div>
+            <StatusBanner
+              tone="error"
+              action={
+                canRetry && conversationId
+                  ? {
+                      label: "Retry",
+                      disabled: isLoading,
+                      onClick: () => void handleSend({ kind: "regenerate" }),
+                    }
+                  : undefined
+              }
+            >
+              {messageError}
+            </StatusBanner>
+          ) : null}
+
+          {notice ? (
+            <StatusBanner
+              tone="info"
+              action={
+                canRetry && conversationId
+                  ? {
+                      label: "Retry",
+                      disabled: isLoading,
+                      onClick: () => void handleSend({ kind: "regenerate" }),
+                    }
+                  : undefined
+              }
+            >
+              {notice}
+            </StatusBanner>
+          ) : null}
+
+          {truncated ? (
+            <StatusBanner
+              tone="info"
+              action={{
+                label: "Continue",
+                disabled: isLoading,
+                onClick: () =>
+                  void handleSend({ kind: "message", text: CONTINUE_PROMPT }),
+              }}
+            >
+              The answer reached its length limit.
+            </StatusBanner>
           ) : null}
 
           {secureContextStatus !== "ready" ? (
-            <div className="mx-auto w-full max-w-3xl px-6 pt-3">
-              <div className="rounded-lg border border-border bg-secondary/40 px-4 py-2.5 text-xs text-muted-foreground">
-                {secureContextStatus === "locked"
-                  ? "Unlock the vault to let Pax use the saved owner profile."
-                  : secureContextStatus === "error"
-                    ? "The saved owner profile could not be loaded."
-                    : "Loading the saved owner profile…"}
-              </div>
-            </div>
+            <StatusBanner tone="info">
+              {secureContextStatus === "locked"
+                ? "Unlock the vault to let Pax use the saved owner profile."
+                : secureContextStatus === "error"
+                  ? "The saved owner profile could not be loaded."
+                  : "Loading the saved owner profile…"}
+            </StatusBanner>
           ) : null}
 
           {/* Messages area or empty state */}
-          {hasOlderMessages ? (
-            <button
-              type="button"
-              className="py-2 text-xs text-muted-foreground"
-              disabled={loadingOlderMessages || isLoading}
-              onClick={() => void loadOlderMessages()}
-            >
-              {loadingOlderMessages ? "Loading…" : "Load earlier messages"}
-            </button>
-          ) : null}
           {!loadingMessages && !hasMessages ? (
             <EmptyState
               composerRef={composerRef}
@@ -558,6 +871,9 @@ export default function AssistantPage() {
               messages={messages}
               isLoading={isLoading}
               loadingMessages={loadingMessages}
+              hasOlderMessages={hasOlderMessages}
+              loadingOlderMessages={loadingOlderMessages}
+              onLoadOlder={() => void loadOlderMessages()}
             />
           )}
 
@@ -568,7 +884,8 @@ export default function AssistantPage() {
             disabled={secureContextStatus !== "ready" || loadingMessages}
             composerRef={composerRef}
             onChange={setInput}
-            onSend={() => void handleSend()}
+            onSend={() => void handleSend({ kind: "message", text: input })}
+            onStop={stopGenerating}
           />
         </section>
       </div>
