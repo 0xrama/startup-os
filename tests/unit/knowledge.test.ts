@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { chunkText, toCitation } from "../../src/lib/knowledge";
+import {
+  buildKnowledgeRows,
+  chunkText,
+  toCitation,
+} from "../../src/lib/knowledge";
 
 describe("chunkText", () => {
   it("splits content into fixed-size chunks", () => {
@@ -12,6 +16,10 @@ describe("chunkText", () => {
 
   it("returns nothing for blank input", () => {
     expect(chunkText("   \n\t ")).toEqual([]);
+  });
+
+  it.each([0, -1, 0.5, Number.NaN])("rejects invalid chunk size %s", (size) => {
+    expect(() => chunkText("abc", size)).toThrow("positive integer");
   });
 });
 
@@ -45,5 +53,18 @@ describe("toCitation", () => {
       label: "Fallback source",
       sourceType: "irs",
     });
+  });
+});
+
+describe("document knowledge rows", () => {
+  it("sets a cascading document reference for every extracted chunk", () => {
+    const [row] = buildKnowledgeRows({
+      source: "Test",
+      sourceId: "doc-1",
+      chunks: ["Text"],
+      metadata: { documentId: "doc-1", llcId: "llc-1", kind: "user_document" },
+    });
+
+    expect(row).toMatchObject({ id: "doc-1:1", documentId: "doc-1" });
   });
 });

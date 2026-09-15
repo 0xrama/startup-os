@@ -2,6 +2,7 @@ import {
   assessOwnershipScope,
   type DirectIndividualOwner,
 } from "./ownership-scope";
+import { calendarYearFilingDeadline } from "@/modules/compliance/deadlines";
 
 export type TaxMember = Omit<DirectIndividualOwner, "usTaxStatus"> & {
   usTaxStatus?: DirectIndividualOwner["usTaxStatus"];
@@ -92,36 +93,14 @@ export const FORM_1065_SOURCE: TaxSourceReference = {
 };
 
 export function currentFilingTaxYear(now: Date) {
-  return now.getUTCMonth() < 3
-    ? now.getUTCFullYear() - 1
-    : now.getUTCFullYear();
-}
+  const year = now.getUTCFullYear();
 
-function parseTaxYearEnd(value: string | null) {
-  const match = /^(\d{2})-(\d{2})$/.exec(value ?? "12-31");
+  // The return for tax year (year - 1) is due in April of `year`. Until that
+  // deadline passes, that return is the next one owed; afterwards the current
+  // calendar year's return becomes the next filing.
+  const unpassedDeadline = calendarYearFilingDeadline(year - 1, 4);
 
-  if (!match) return { month: 12, day: 31 };
-
-  const month = Number(match[1]);
-  const day = Number(match[2]);
-
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
-    return { month: 12, day: 31 };
-  }
-
-  return { month, day };
-}
-
-function rollWeekend(date: Date) {
-  const result = new Date(date);
-
-  if (result.getUTCDay() === 6) {
-    result.setUTCDate(result.getUTCDate() + 2);
-  } else if (result.getUTCDay() === 0) {
-    result.setUTCDate(result.getUTCDate() + 1);
-  }
-
-  return result;
+  return now.toISOString().slice(0, 10) <= unpassedDeadline ? year - 1 : year;
 }
 
 function filingDueDate(
@@ -129,10 +108,9 @@ function filingDueDate(
   taxYearEnd: string | null,
   monthsAfterYearEnd: number
 ) {
-  const { month } = parseTaxYearEnd(taxYearEnd);
-  const due = new Date(Date.UTC(taxYear, month - 1 + monthsAfterYearEnd, 15));
+  if (taxYearEnd && taxYearEnd !== "12-31") return null;
 
-  return rollWeekend(due).toISOString().slice(0, 10);
+  return calendarYearFilingDeadline(taxYear, monthsAfterYearEnd);
 }
 
 function hasForeignMember(profile: TaxEntityProfile) {
@@ -253,18 +231,26 @@ export function assessFederalTaxFiling(
   profile: TaxEntityProfile,
   options: { taxYear?: number; now?: Date } = {}
 ): FilingAssessment {
+  const formationYear = Number(profile.formationDate?.slice(0, 4)) || 0;
+
   const taxYear =
-    options.taxYear ?? currentFilingTaxYear(options.now ?? new Date());
+    options.taxYear ??
+    Math.max(currentFilingTaxYear(options.now ?? new Date()), formationYear);
 
   const scope = assessOwnershipScope(profile);
 
-  if (scope.route === "partnership") return assessPartnership(profile, taxYear);
+  const calendarYear =
+    (!profile.taxYearEnd || profile.taxYearEnd === "12-31") &&
+    taxYear >= formationYear;
 
-  if (scope.route === "foreign_owned_disregarded_entity") {
+  if (calendarYear && scope.route === "partnership")
+    return assessPartnership(profile, taxYear);
+
+  if (calendarYear && scope.route === "foreign_owned_disregarded_entity") {
     return assessForeignOwnedDisregardedEntity(profile, taxYear);
   }
 
-  if (scope.route === "domestic_disregarded_entity") {
+  if (calendarYear && scope.route === "domestic_disregarded_entity") {
     return assessDomesticDisregardedEntity(profile, taxYear);
   }
 
@@ -282,6 +268,7 @@ export function assessFederalTaxFiling(
     warnings: [
       "Pax does not prepare corporation returns, LLC corporate-tax elections, entity-owner structures, or indirect ownership structures.",
       "Update and confirm the ownership profile or consult a qualified tax professional before relying on a filing deadline.",
+      "Fiscal years, short years, disaster relief, and location-specific extensions require professional review.",
     ],
     nextSteps: [
       "Confirm that every owner is an individual who holds the ownership interest directly.",

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { llcs, complianceTasks, documents } from "@/lib/schema";
-import { eq, and, lte, ne, inArray } from "drizzle-orm";
+import { eq, and, lte, ne, inArray, count } from "drizzle-orm";
 import Link from "next/link";
 import {
   Building2,
@@ -44,14 +44,15 @@ export default async function DashboardPage() {
           ),
           ne(complianceTasks.status, "completed")
         )
-      );
+      )
+      .orderBy(complianceTasks.dueDate);
 
-    const docs = await db
-      .select()
+    const [documentCount] = await db
+      .select({ value: count() })
       .from(documents)
       .where(eq(documents.userId, session.user.id));
 
-    docCount = docs.length;
+    docCount = documentCount.value;
   }
 
   const overdueTasks = upcomingTasks.filter((t) => t.status === "overdue");

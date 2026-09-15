@@ -1,7 +1,19 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { chatConversations, chatMessages } from "./schema";
 import type { Citation } from "./knowledge";
+import { AI_MAX_HISTORY_MESSAGES } from "./ai-limits";
+
+export async function getConversationContext(conversationId: string) {
+  const messages = await db
+    .select({ role: chatMessages.role, content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+    .limit(AI_MAX_HISTORY_MESSAGES);
+
+  return messages.reverse();
+}
 
 export async function listConversations(userId: string, llcId?: string) {
   return db
@@ -31,12 +43,39 @@ export async function getConversation(userId: string, conversationId: string) {
   });
 }
 
-export async function getConversationMessages(conversationId: string) {
-  return db
-    .select()
+export async function getConversationMessages(
+  conversationId: string,
+  { before, limit = 100 }: { before?: string; limit?: number } = {}
+) {
+  const pageSize = Math.max(1, Math.min(100, Math.trunc(limit) || 100));
+
+  const rows = await db
+    .select({
+      id: chatMessages.id,
+      role: chatMessages.role,
+      content: chatMessages.content,
+      citations: chatMessages.citations,
+      createdAt: chatMessages.createdAt,
+    })
     .from(chatMessages)
-    .where(eq(chatMessages.conversationId, conversationId))
-    .orderBy(chatMessages.createdAt);
+    .where(
+      and(
+        eq(chatMessages.conversationId, conversationId),
+        before
+          ? sql`(${chatMessages.createdAt}, ${chatMessages.id}) < (
+        SELECT created_at, id FROM chat_messages
+        WHERE id = ${before} AND conversation_id = ${conversationId}
+      )`
+          : undefined
+      )
+    )
+    .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+    .limit(pageSize + 1);
+
+  return {
+    messages: rows.slice(0, pageSize).reverse(),
+    hasMore: rows.length > pageSize,
+  };
 }
 
 export async function ensureConversation({
@@ -53,7 +92,7 @@ export async function ensureConversation({
   if (conversationId) {
     const existing = await getConversation(userId, conversationId);
 
-    if (!existing) {
+    if (!existing || existing.llcId !== (llcId ?? null)) {
       throw new Error("NOT_FOUND");
     }
 
@@ -109,19 +148,14 @@ export async function createMessage({
     })
     .returning();
 
-  const conversation = await db.query.chatConversations.findFirst({
-    where: eq(chatConversations.id, conversationId),
-    columns: { title: true },
-  });
-
   await db
     .update(chatConversations)
     .set({
       lastMessageAt: new Date(),
       updatedAt: new Date(),
       title:
-        role === "user" && content && !conversation?.title
-          ? content.slice(0, 80)
+        role === "user" && content
+          ? sql`coalesce(nullif(${chatConversations.title}, ''), ${content.slice(0, 80)})`
           : undefined,
     })
     .where(eq(chatConversations.id, conversationId));

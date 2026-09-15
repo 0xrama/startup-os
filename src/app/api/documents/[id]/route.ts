@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { documents } from "@/lib/schema";
-import { deleteObject } from "@/lib/r2";
 import { eq } from "drizzle-orm";
 import { logAudit } from "@/lib/audit";
 import { requireApiContext, requireApiLlcAccess } from "@/lib/route-guards";
-import { deleteKnowledgeChunksBySource } from "@/lib/knowledge";
+import { deleteDocument } from "@/modules/documents/lifecycle";
 
 export async function DELETE(
   request: NextRequest,
@@ -30,9 +29,7 @@ export async function DELETE(
 
   if ("response" in llcAccess) return llcAccess.response;
 
-  await deleteObject(doc.fileKey);
-  await deleteKnowledgeChunksBySource(id);
-  await db.delete(documents).where(eq(documents.id, id));
+  await deleteDocument(id, session.user.id);
 
   await logAudit({
     userId: session.user.id,

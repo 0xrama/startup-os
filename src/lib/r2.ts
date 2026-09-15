@@ -1,3 +1,5 @@
+import { DOCUMENT_MAX_BYTES } from "./ai-limits";
+
 async function createR2Client(endpoint: string) {
   const [
     { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand },
@@ -74,20 +76,38 @@ export async function getDownloadUrl(key: string, expiresIn = 900) {
   return getSignedUrl(client, command, { expiresIn });
 }
 
-export async function getObjectBytes(key: string) {
+export async function getObjectBytes(
+  key: string,
+  maxBytes = DOCUMENT_MAX_BYTES,
+  abortSignal?: AbortSignal
+) {
   const { client, GetObjectCommand } = await getR2Client();
 
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
+    Range: `bytes=0-${maxBytes}`,
   });
 
-  const response = await client.send(command);
+  const response = await client.send(command, { abortSignal });
 
-  return Buffer.from(await response.Body!.transformToByteArray());
+  if (!response.Body) throw new Error("Document body is missing");
+
+  if (response.ContentLength && response.ContentLength > maxBytes) {
+    // Drain no oversized payload into memory.
+    if ("destroy" in response.Body) response.Body.destroy();
+    throw new Error("File too large for analysis");
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+
+  if (bytes.byteLength > maxBytes)
+    throw new Error("File too large for analysis");
+
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
-export async function deleteObject(key: string) {
+export async function deleteObject(key: string, signal?: AbortSignal) {
   const { client, DeleteObjectCommand } = await getR2Client();
 
   const command = new DeleteObjectCommand({
@@ -95,5 +115,30 @@ export async function deleteObject(key: string) {
     Key: key,
   });
 
-  return client.send(command);
+  return client.send(command, {
+    abortSignal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(30_000)])
+      : AbortSignal.timeout(30_000),
+  });
+}
+
+export async function putObjectBytes(key: string, body: Uint8Array) {
+  const { client, PutObjectCommand } = await getR2Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: "application/octet-stream",
+    }),
+    { abortSignal: AbortSignal.timeout(30_000) }
+  );
+}
+
+export async function checkObjectStorage() {
+  const { client } = await getR2Client();
+  const { HeadBucketCommand } = await import("@aws-sdk/client-s3");
+  await client.send(new HeadBucketCommand({ Bucket: BUCKET }), {
+    abortSignal: AbortSignal.timeout(5_000),
+  });
 }

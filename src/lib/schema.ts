@@ -6,9 +6,11 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import type { JsonValue } from "./json";
+import { sql } from "drizzle-orm";
 
 const nextId = () => crypto.randomUUID();
 
@@ -23,23 +25,27 @@ export type AuditMetadata = { [key: string]: JsonValue };
 // We extend the user table with additional columns via Better Auth config.
 // The tables below reference user.id as text.
 
-export const user = pgTable("user", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  name: text("name"),
-  email: text("email").notNull(),
-  emailVerified: boolean("email_verified").default(false),
-  image: text("image"),
-  phone: text("phone"),
-  phoneVerified: boolean("phone_verified").default(false),
-  whatsappOptedIn: boolean("whatsapp_opted_in").default(false),
-  timezone: text("timezone").default("UTC"),
-  onboardingCompleted: boolean("onboarding_completed").default(false),
-  twoFactorEnabled: boolean("two_factor_enabled").default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const user = pgTable(
+  "user",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    name: text("name"),
+    email: text("email").notNull(),
+    emailVerified: boolean("email_verified").default(false),
+    image: text("image"),
+    phone: text("phone"),
+    phoneVerified: boolean("phone_verified").default(false),
+    whatsappOptedIn: boolean("whatsapp_opted_in").default(false),
+    timezone: text("timezone").default("UTC"),
+    onboardingCompleted: boolean("onboarding_completed").default(false),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  () => [uniqueIndex("single_owner_idx").on(sql`(true)`)]
+);
 
 export const session = pgTable("session", {
   id: text("id")
@@ -144,120 +150,135 @@ export const passkey = pgTable(
 
 // ─── LLCs ────────────────────────────────────────────────────────
 
-export const llcs = pgTable("llcs", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  state: text("state").notNull(),
-  entityType: text("entity_type").notNull(),
-  ownerResidency: text("owner_residency").default("non_us"),
-  ownersAreIndividuals: boolean("owners_are_individuals"),
-  ownershipIsDirect: boolean("ownership_is_direct"),
-  ownerCount: integer("owner_count"),
-  foreignOwnerCount: integer("foreign_owner_count"),
-  usOwnerCount: integer("us_owner_count"),
-  formationDate: text("formation_date"),
-  ein: text("ein"),
-  einStatus: text("ein_status").default("pending"),
-  taxYearEnd: text("tax_year_end").default("12-31"),
-  taxClassification: text("tax_classification"),
-  registeredAgent: text("registered_agent"),
-  raRenewalDate: text("ra_renewal_date"),
-  annualReportMonth: integer("annual_report_month"),
-  members: jsonb("members").$type<
-    {
-      name: string;
-      ownershipPct: number;
-      country: string;
-      taxIdType: string;
-      usTaxStatus?: "us_person" | "foreign_person";
-    }[]
-  >(),
-  filingPreferences: jsonb("filing_preferences").$type<{
-    remindDaysBefore: number;
-    channels: ("email" | "whatsapp")[];
-    checklists?: {
-      first30Days?: Record<string, boolean>;
-    };
-    wyAnnualFeeReminderEnabled?: boolean;
-  }>(),
-  wellnessProfile: jsonb("wellness_profile").$type<{
-    businessStatus?: "not_started" | "pre_revenue" | "active" | "inactive";
-    businessDescription?: string;
-    engagedInUSTradeOrBusiness?: "yes" | "no" | "unsure";
-    principalPlaceOfBusiness?: "us" | "outside_us" | "unsure";
-    hasUSBankAccount?: boolean;
-    bookkeepingCurrent?: boolean;
-    hasEmployees?: boolean;
-    usesContractors?: boolean;
-    makesTaxableSales?: boolean;
-    operatesOutsideFormationState?: boolean;
-    updatedAt?: string;
-  } | null>(),
-  encryptedData: jsonb("encrypted_data").$type<{
-    version: 1;
-    iv: string;
-    ciphertext: string;
-  } | null>(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const llcs = pgTable(
+  "llcs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    state: text("state").notNull(),
+    entityType: text("entity_type").notNull(),
+    ownerResidency: text("owner_residency").default("non_us"),
+    ownersAreIndividuals: boolean("owners_are_individuals"),
+    ownershipIsDirect: boolean("ownership_is_direct"),
+    ownerCount: integer("owner_count"),
+    foreignOwnerCount: integer("foreign_owner_count"),
+    usOwnerCount: integer("us_owner_count"),
+    formationDate: text("formation_date"),
+    ein: text("ein"),
+    einStatus: text("ein_status").default("pending"),
+    taxYearEnd: text("tax_year_end").default("12-31"),
+    taxClassification: text("tax_classification"),
+    registeredAgent: text("registered_agent"),
+    raRenewalDate: text("ra_renewal_date"),
+    annualReportMonth: integer("annual_report_month"),
+    members: jsonb("members").$type<
+      {
+        name: string;
+        ownershipPct: number;
+        country: string;
+        taxIdType: string;
+        usTaxStatus?: "us_person" | "foreign_person";
+      }[]
+    >(),
+    filingPreferences: jsonb("filing_preferences").$type<{
+      remindDaysBefore: number;
+      channels: ("email" | "whatsapp")[];
+      checklists?: {
+        first30Days?: Record<string, boolean>;
+      };
+      wyAnnualFeeReminderEnabled?: boolean;
+    }>(),
+    wellnessProfile: jsonb("wellness_profile").$type<{
+      businessStatus?: "not_started" | "pre_revenue" | "active" | "inactive";
+      businessDescription?: string;
+      engagedInUSTradeOrBusiness?: "yes" | "no" | "unsure";
+      principalPlaceOfBusiness?: "us" | "outside_us" | "unsure";
+      hasUSBankAccount?: boolean;
+      bookkeepingCurrent?: boolean;
+      hasEmployees?: boolean;
+      usesContractors?: boolean;
+      makesTaxableSales?: boolean;
+      operatesOutsideFormationState?: boolean;
+      updatedAt?: string;
+    } | null>(),
+    encryptedData: jsonb("encrypted_data").$type<{
+      version: 1;
+      iv: string;
+      ciphertext: string;
+    } | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [index("llcs_user_id_idx").on(table.userId)]
+);
 
 // ─── Documents ───────────────────────────────────────────────────
 
-export const documents = pgTable("documents", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  llcId: text("llc_id")
-    .notNull()
-    .references(() => llcs.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull(),
-  name: text("name").notNull(),
-  fileKey: text("file_key").notNull(),
-  fileType: text("file_type"),
-  fileSize: integer("file_size"),
-  category: text("category"),
-  documentType: text("document_type"),
-  taxYear: integer("tax_year"),
-  description: text("description"),
-  scanStatus: text("scan_status").default("pending"),
-  processingStatus: text("processing_status").default("pending"),
-  processingError: text("processing_error"),
-  extractedTextStatus: text("extracted_text_status").default("pending"),
-  extractedMetadata: jsonb("extracted_metadata").$type<{
-    summary?: string;
-    textPreview?: string;
-    issuer?: string;
-    noticeNumber?: string;
-    dueDate?: string;
-    amountDue?: string;
-    taxYear?: number;
-    entityName?: string;
-    state?: string;
-    issueDate?: string;
-    formName?: string;
-    members?: string[];
-    classificationConfidence?: number;
-    extractedText?: string;
-  } | null>(),
-  encryptedMetadata: jsonb("encrypted_metadata").$type<{
-    version: 1;
-    iv: string;
-    ciphertext: string;
-  } | null>(),
-  fileIv: text("file_iv"),
-  wrappedFileKey: jsonb("wrapped_file_key").$type<{
-    version: 1;
-    iv: string;
-    ciphertext: string;
-  } | null>(),
-  encryptionVersion: integer("encryption_version").default(1),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const documents = pgTable(
+  "documents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    llcId: text("llc_id")
+      .notNull()
+      .references(() => llcs.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    fileKey: text("file_key").notNull(),
+    fileType: text("file_type"),
+    fileSize: integer("file_size"),
+    category: text("category"),
+    documentType: text("document_type"),
+    taxYear: integer("tax_year"),
+    description: text("description"),
+    scanStatus: text("scan_status").default("pending"),
+    processingStatus: text("processing_status").default("pending"),
+    processingError: text("processing_error"),
+    analysisConsentVersion: text("analysis_consent_version"),
+    analysisConsentAt: timestamp("analysis_consent_at", { withTimezone: true }),
+    analysisExpiresAt: timestamp("analysis_expires_at", { withTimezone: true }),
+    analysisJobId: text("analysis_job_id"),
+    extractedTextStatus: text("extracted_text_status").default("pending"),
+    extractedMetadata: jsonb("extracted_metadata").$type<{
+      summary?: string;
+      textPreview?: string;
+      issuer?: string;
+      noticeNumber?: string;
+      dueDate?: string;
+      amountDue?: string;
+      taxYear?: number;
+      entityName?: string;
+      state?: string;
+      issueDate?: string;
+      formName?: string;
+      members?: string[];
+      classificationConfidence?: number;
+      extractedText?: string;
+    } | null>(),
+    encryptedMetadata: jsonb("encrypted_metadata").$type<{
+      version: 1;
+      iv: string;
+      ciphertext: string;
+    } | null>(),
+    fileIv: text("file_iv"),
+    wrappedFileKey: jsonb("wrapped_file_key").$type<{
+      version: 1;
+      iv: string;
+      ciphertext: string;
+    } | null>(),
+    encryptionVersion: integer("encryption_version").default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("documents_llc_created_idx").on(table.llcId, table.createdAt),
+    index("documents_user_id_idx").on(table.userId),
+  ]
+);
 
 export const userEncryption = pgTable("user_encryption", {
   id: text("id")
@@ -282,151 +303,199 @@ export const userEncryption = pgTable("user_encryption", {
 
 // ─── Compliance Tasks ────────────────────────────────────────────
 
-export const complianceTasks = pgTable("compliance_tasks", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  llcId: text("llc_id")
-    .notNull()
-    .references(() => llcs.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  category: text("category"),
-  dueDate: text("due_date").notNull(),
-  status: text("status").default("upcoming"),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  recurring: boolean("recurring").default(false),
-  recurrenceRule: text("recurrence_rule"),
-  source: text("source").default("system"),
-  metadata: jsonb("metadata").$type<{
-    filingCode?: string;
-    filingYear?: number;
-    optional?: boolean;
-    applicable?: boolean;
-    optionalPrompt?: string;
-    checklist?: {
-      id: string;
-      label: string;
-      done?: boolean;
-    }[];
-    filing?: {
-      filedAt?: string | null;
-      filedMethod?:
-        | "fax"
-        | "mail"
-        | "online"
-        | "e-file"
-        | "phone"
-        | "manual"
-        | "other"
-        | null;
-      acknowledgementStatus?: "received" | "pending" | "not_available" | null;
-      acknowledgementReference?: string | null;
-      notes?: string | null;
-    };
-  } | null>(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const complianceTasks = pgTable(
+  "compliance_tasks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    llcId: text("llc_id")
+      .notNull()
+      .references(() => llcs.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category"),
+    dueDate: text("due_date").notNull(),
+    status: text("status").default("upcoming"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    recurring: boolean("recurring").default(false),
+    recurrenceRule: text("recurrence_rule"),
+    source: text("source").default("system"),
+    metadata: jsonb("metadata").$type<{
+      filingCode?: string;
+      filingYear?: number;
+      optional?: boolean;
+      applicable?: boolean;
+      optionalPrompt?: string;
+      checklist?: {
+        id: string;
+        label: string;
+        done?: boolean;
+      }[];
+      filing?: {
+        filedAt?: string | null;
+        filedMethod?:
+          | "fax"
+          | "mail"
+          | "online"
+          | "e-file"
+          | "phone"
+          | "manual"
+          | "other"
+          | null;
+        acknowledgementStatus?: "received" | "pending" | "not_available" | null;
+        acknowledgementReference?: string | null;
+        notes?: string | null;
+      };
+    } | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("compliance_tasks_llc_due_idx").on(table.llcId, table.dueDate),
+  ]
+);
 
 // ─── Reminders ───────────────────────────────────────────────────
 
-export const reminders = pgTable("reminders", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  taskId: text("task_id")
-    .notNull()
-    .references(() => complianceTasks.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull(),
-  channel: text("channel").notNull(),
-  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
-  sentAt: timestamp("sent_at", { withTimezone: true }),
-  status: text("status").default("pending"),
-  messageId: text("message_id"),
-  idempotencyKey: text("idempotency_key"),
-  attemptCount: integer("attempt_count").default(0),
-  lastError: text("last_error"),
-  processingStartedAt: timestamp("processing_started_at", {
-    withTimezone: true,
-  }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => complianceTasks.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    channel: text("channel").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    status: text("status").default("pending"),
+    messageId: text("message_id"),
+    idempotencyKey: text("idempotency_key"),
+    attemptCount: integer("attempt_count").default(0),
+    lastError: text("last_error"),
+    processingStartedAt: timestamp("processing_started_at", {
+      withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("reminders_status_scheduled_idx").on(table.status, table.scheduledAt),
+    uniqueIndex("reminders_idempotency_idx").on(table.idempotencyKey),
+  ]
+);
 
 // ─── Chat ────────────────────────────────────────────────────────
 
-export const chatConversations = pgTable("chat_conversations", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  llcId: text("llc_id").references(() => llcs.id, { onDelete: "set null" }),
-  userId: text("user_id").notNull(),
-  title: text("title"),
-  lastMessageAt: timestamp("last_message_at", {
-    withTimezone: true,
-  }).defaultNow(),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const chatConversations = pgTable(
+  "chat_conversations",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    llcId: text("llc_id").references(() => llcs.id, { onDelete: "set null" }),
+    userId: text("user_id").notNull(),
+    title: text("title"),
+    lastMessageAt: timestamp("last_message_at", {
+      withTimezone: true,
+    }).defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("chat_conversations_user_llc_idx").on(
+      table.userId,
+      table.llcId,
+      table.lastMessageAt
+    ),
+  ]
+);
 
-export const chatMessages = pgTable("chat_messages", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  conversationId: text("conversation_id")
-    .notNull()
-    .references(() => chatConversations.id, { onDelete: "cascade" }),
-  role: text("role").$type<ChatRole>().notNull(),
-  requestId: text("request_id"),
-  model: text("model"),
-  finishReason: text("finish_reason"),
-  content: text("content"),
-  toolCalls: jsonb("tool_calls"),
-  toolResults: jsonb("tool_results"),
-  citations: jsonb("citations").$type<
-    {
-      label: string;
-      sourceType: "irs" | "state" | "user_document";
-      sourceTitle: string;
-      excerpt: string;
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => chatConversations.id, { onDelete: "cascade" }),
+    role: text("role").$type<ChatRole>().notNull(),
+    requestId: text("request_id"),
+    model: text("model"),
+    finishReason: text("finish_reason"),
+    content: text("content"),
+    toolCalls: jsonb("tool_calls"),
+    toolResults: jsonb("tool_results"),
+    citations: jsonb("citations").$type<
+      {
+        label: string;
+        sourceType: "irs" | "state" | "user_document";
+        sourceTitle: string;
+        excerpt: string;
+        page?: number;
+        section?: string;
+        documentId?: string;
+        sourceUrl?: string;
+        revision?: string;
+      }[]
+    >(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("chat_messages_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt,
+      table.id
+    ),
+  ]
+);
+
+// ─── Knowledge Chunks ─────────────────────────────────────────
+
+export const knowledgeChunks = pgTable(
+  "knowledge_chunks",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    source: text("source").notNull(),
+    sourceId: text("source_id"),
+    documentId: text("document_id").references(() => documents.id, {
+      onDelete: "cascade",
+    }),
+    content: text("content").notNull(),
+    metadata: jsonb("metadata").$type<{
+      kind?: "irs" | "state" | "user_document";
+      title?: string;
       page?: number;
       section?: string;
+      taxYear?: number;
+      state?: string;
+      form?: string;
       documentId?: string;
+      llcId?: string;
+      effectiveDate?: string;
       sourceUrl?: string;
       revision?: string;
-    }[]
-  >(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
-
-// ─── Knowledge Chunks (RAG — future) ────────────────────────────
-
-export const knowledgeChunks = pgTable("knowledge_chunks", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  source: text("source").notNull(),
-  sourceId: text("source_id"),
-  content: text("content").notNull(),
-  metadata: jsonb("metadata").$type<{
-    kind?: "irs" | "state" | "user_document";
-    title?: string;
-    page?: number;
-    section?: string;
-    taxYear?: number;
-    state?: string;
-    form?: string;
-    documentId?: string;
-    llcId?: string;
-    effectiveDate?: string;
-    sourceUrl?: string;
-    revision?: string;
-    retrievedAt?: string;
-  }>(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+      retrievedAt?: string;
+    }>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("knowledge_chunks_search_idx").using(
+      "gin",
+      sql`to_tsvector('english', ${table.content})`
+    ),
+    index("knowledge_chunks_source_id_idx").on(table.sourceId),
+    index("knowledge_chunks_document_id_idx").on(table.documentId),
+    index("knowledge_chunks_llc_id_idx").on(sql`(${table.metadata}->>'llcId')`),
+  ]
+);
 
 // ─── App Settings ────────────────────────────────────────────────
 
@@ -440,36 +509,43 @@ export const appSettings = pgTable("app_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const noticeCases = pgTable("notice_cases", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => nextId()),
-  documentId: text("document_id").references(() => documents.id, {
-    onDelete: "cascade",
-  }),
-  llcId: text("llc_id")
-    .notNull()
-    .references(() => llcs.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull(),
-  status: text("status").notNull().default("processing"),
-  issuer: text("issuer"),
-  noticeType: text("notice_type"),
-  taxYear: integer("tax_year"),
-  responseDueDate: text("response_due_date"),
-  summary: text("summary"),
-  riskLevel: text("risk_level"),
-  structuredData: jsonb("structured_data").$type<JsonValue | null>(),
-  draftTaskPayload: jsonb("draft_task_payload").$type<{
-    title?: string;
-    description?: string;
-    dueDate?: string;
-    category?: string;
-    reminders?: { offsetDays: number; channel: "email" | "whatsapp" }[];
-  } | null>(),
-  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const noticeCases = pgTable(
+  "notice_cases",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => nextId()),
+    documentId: text("document_id").references(() => documents.id, {
+      onDelete: "cascade",
+    }),
+    llcId: text("llc_id")
+      .notNull()
+      .references(() => llcs.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    status: text("status").notNull().default("processing"),
+    issuer: text("issuer"),
+    noticeType: text("notice_type"),
+    taxYear: integer("tax_year"),
+    responseDueDate: text("response_due_date"),
+    summary: text("summary"),
+    riskLevel: text("risk_level"),
+    structuredData: jsonb("structured_data").$type<JsonValue | null>(),
+    draftTaskPayload: jsonb("draft_task_payload").$type<{
+      title?: string;
+      description?: string;
+      dueDate?: string;
+      category?: string;
+      reminders?: { offsetDays: number; channel: "email" | "whatsapp" }[];
+    } | null>(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("notice_cases_llc_id_idx").on(table.llcId),
+    index("notice_cases_document_id_idx").on(table.documentId),
+  ]
+);
 
 /**
  * Versioned filing preparation packages. Content is frozen at generation time
@@ -530,3 +606,101 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: text("id").primaryKey().$default(nextId),
+    userId: text("user_id"),
+    kind: text("kind").notNull(),
+    targetId: text("target_id"),
+    payload: text("payload").notNull(),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    status: text("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    availableAt: timestamp("available_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    leaseToken: text("lease_token"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("jobs_claim_idx").on(table.status, table.availableAt),
+    index("jobs_user_idx").on(table.userId),
+    index("jobs_kind_target_idx").on(table.kind, table.targetId),
+  ]
+);
+
+export const operationEvents = pgTable(
+  "operation_events",
+  {
+    id: text("id").primaryKey().$default(nextId),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    requestId: text("request_id"),
+    model: text("model"),
+    promptVersion: text("prompt_version"),
+    sourceRevisions: jsonb("source_revisions").$type<string[]>(),
+    durationMs: integer("duration_ms"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("operation_events_kind_created_idx").on(table.kind, table.createdAt),
+  ]
+);
+
+export const workerHeartbeats = pgTable("worker_heartbeats", {
+  id: text("id").primaryKey(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const relatedPartyTransactions = pgTable(
+  "related_party_transactions",
+  {
+    id: text("id").primaryKey().$default(nextId),
+    llcId: text("llc_id")
+      .notNull()
+      .references(() => llcs.id, { onDelete: "cascade" }),
+    taxYear: integer("tax_year").notNull(),
+    encryptedData: text("encrypted_data").notNull(),
+    reviewStatus: text("review_status").notNull().default("draft"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("transactions_llc_year_idx").on(table.llcId, table.taxYear)]
+);
+
+export const filingAssessments = pgTable(
+  "filing_assessments",
+  {
+    id: text("id").primaryKey().$default(nextId),
+    llcId: text("llc_id")
+      .notNull()
+      .references(() => llcs.id, { onDelete: "cascade" }),
+    taxYear: integer("tax_year").notNull(),
+    ruleVersion: text("rule_version").notNull(),
+    encryptedSnapshot: text("encrypted_snapshot").notNull(),
+    reviewStatus: text("review_status").notNull().default("unreviewed"),
+    reviewNotes: text("review_notes"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("assessments_llc_year_idx").on(table.llcId, table.taxYear)]
+);

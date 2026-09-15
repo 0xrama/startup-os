@@ -39,6 +39,10 @@ export type KnowledgeSearchResult = {
 };
 
 export function chunkText(content: string, size = 1200) {
+  if (!Number.isInteger(size) || size < 1) {
+    throw new Error("Chunk size must be a positive integer");
+  }
+
   const normalized = content.replace(/\s+/g, " ").trim();
 
   if (!normalized) return [];
@@ -60,7 +64,7 @@ function toChunkId(sourceId: string | undefined, index: number) {
   return `${sourceId}:${index + 1}`;
 }
 
-export async function storeKnowledgeChunks({
+export function buildKnowledgeRows({
   source,
   sourceId,
   chunks,
@@ -71,9 +75,7 @@ export async function storeKnowledgeChunks({
   chunks: string[];
   metadata: KnowledgeChunkMetadata;
 }) {
-  if (chunks.length === 0) return;
-
-  const values = chunks.map((content, index) => {
+  return chunks.map((content, index) => {
     const chunkMetadata: KnowledgeChunkMetadata = {
       ...metadata,
       section:
@@ -86,27 +88,42 @@ export async function storeKnowledgeChunks({
       id: toChunkId(sourceId, index),
       source,
       sourceId: sourceId ?? null,
+      documentId: metadata.documentId ?? null,
       content,
       metadata: chunkMetadata,
     };
   });
-
-  await db
-    .insert(knowledgeChunks)
-    .values(values)
-    .onConflictDoUpdate({
-      target: knowledgeChunks.id,
-      set: {
-        source: sql`excluded.source`,
-        sourceId: sql`excluded.source_id`,
-        content: sql`excluded.content`,
-        metadata: sql`excluded.metadata`,
-      },
-    });
 }
 
-export async function deleteKnowledgeChunksBySource(sourceId: string) {
-  await db
+export async function storeKnowledgeChunks(
+  input: Parameters<typeof buildKnowledgeRows>[0],
+  database: Pick<typeof db, "insert"> = db
+) {
+  const values = buildKnowledgeRows(input);
+
+  // Stay below PostgreSQL parameter limits and avoid a huge query allocation.
+  for (let offset = 0; offset < values.length; offset += 100) {
+    await database
+      .insert(knowledgeChunks)
+      .values(values.slice(offset, offset + 100))
+      .onConflictDoUpdate({
+        target: knowledgeChunks.id,
+        set: {
+          source: sql`excluded.source`,
+          sourceId: sql`excluded.source_id`,
+          documentId: sql`excluded.document_id`,
+          content: sql`excluded.content`,
+          metadata: sql`excluded.metadata`,
+        },
+      });
+  }
+}
+
+export async function deleteKnowledgeChunksBySource(
+  sourceId: string,
+  database: Pick<typeof db, "delete"> = db
+) {
+  await database
     .delete(knowledgeChunks)
     .where(eq(knowledgeChunks.sourceId, sourceId));
 }
@@ -142,11 +159,17 @@ export async function searchKnowledgeBase({
     .where(
       and(
         sql`to_tsvector('english', ${knowledgeChunks.content}) @@ websearch_to_tsquery('english', ${trimmed})`,
-        namespaceFilter
+        namespaceFilter,
+        sql`(${knowledgeChunks.metadata}->>'kind' IS DISTINCT FROM 'user_document'
+          OR EXISTS (SELECT 1 FROM ${documents}
+            WHERE ${documents.id} = ${knowledgeChunks.metadata}->>'documentId'
+            AND ${documents.analysisConsentAt} IS NOT NULL
+            AND ${documents.analysisExpiresAt} > now()
+            AND ${documents.llcId} = ${knowledgeChunks.metadata}->>'llcId'))`
       )
     )
     .orderBy(desc(rank))
-    .limit(limit);
+    .limit(Math.max(1, Math.min(10, Math.trunc(limit) || 5)));
 
   return rows.map((row) => ({
     id: row.id,
@@ -157,24 +180,46 @@ export async function searchKnowledgeBase({
   }));
 }
 
-export async function getDocumentSearchResults(llcId: string, query: string) {
-  const docs = await db.query.documents.findMany({
-    where: eq(documents.llcId, llcId),
-  });
+export async function getDocumentSearchResults(
+  llcId: string,
+  query = "",
+  category?: string
+) {
+  const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
 
-  const q = query.toLowerCase();
-
-  return docs.filter((doc) => {
-    const metadata = doc.extractedMetadata;
-
-    return (
-      doc.name.toLowerCase().includes(q) ||
-      doc.category?.toLowerCase().includes(q) ||
-      metadata?.summary?.toLowerCase().includes(q) ||
-      metadata?.textPreview?.toLowerCase().includes(q) ||
-      metadata?.extractedText?.toLowerCase().includes(q)
-    );
-  });
+  return db
+    .select({
+      id: documents.id,
+      name: documents.name,
+      category: documents.category,
+      taxYear: documents.taxYear,
+      createdAt: documents.createdAt,
+      summary: sql<
+        string | null
+      >`CASE WHEN ${documents.analysisConsentAt} IS NOT NULL
+        AND ${documents.analysisExpiresAt} > now() THEN ${documents.extractedMetadata}->>'summary' ELSE NULL END`,
+    })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.llcId, llcId),
+        category ? eq(documents.category, category) : undefined,
+        query
+          ? sql`(
+        ${documents.name} ILIKE ${pattern}
+        OR ${documents.description} ILIKE ${pattern}
+        OR ${documents.category} ILIKE ${pattern}
+        OR (${documents.analysisConsentAt} IS NOT NULL AND ${documents.analysisExpiresAt} > now()
+        AND (${documents.extractedMetadata}->>'summary' ILIKE ${pattern}
+        OR EXISTS (SELECT 1 FROM ${knowledgeChunks}
+          WHERE ${knowledgeChunks.sourceId} = ${documents.id}
+          AND to_tsvector('english', ${knowledgeChunks.content}) @@ websearch_to_tsquery('english', ${query}))))
+      )`
+          : undefined
+      )
+    )
+    .orderBy(desc(documents.createdAt))
+    .limit(20);
 }
 
 export function toCitation(item: KnowledgeSearchResult): Citation {

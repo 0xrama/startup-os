@@ -1,7 +1,10 @@
 import { db } from "./db";
-import { complianceTasks } from "./schema";
+import { complianceTasks, llcs } from "./schema";
+import { eq } from "drizzle-orm";
 import { buildSeedTaskMetadata } from "./compliance-task-details";
-import { assessOwnershipScope } from "./ownership-scope";
+import { assessFederalTaxFiling, currentFilingTaxYear } from "./tax-copilot";
+import { calendarYearFilingDeadline } from "@/modules/compliance/deadlines";
+import { scheduleTaskReminders } from "@/modules/notifications/reminders";
 
 type LLCProfile = {
   id: string;
@@ -35,19 +38,12 @@ type TaskSeed = {
   recurrenceRule: string | null;
 };
 
-function getCurrentTaxYear(): number {
-  const now = new Date();
+function nextDueDate(month: number, day: number, now: Date): string {
+  const year = now.getUTCFullYear();
+  let due = new Date(Date.UTC(year, month, day));
 
-  return now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
-}
-
-function nextDueDate(month: number, day: number): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  let due = new Date(year, month, day);
-
-  if (due < now) {
-    due = new Date(year + 1, month, day);
+  if (due.toISOString().slice(0, 10) < now.toISOString().slice(0, 10)) {
+    due = new Date(Date.UTC(year + 1, month, day));
   }
 
   return due.toISOString().split("T")[0];
@@ -56,14 +52,19 @@ function nextDueDate(month: number, day: number): string {
 function getFormationMonth(formationDate: string | null): number {
   if (!formationDate) return 0;
 
-  return new Date(formationDate).getMonth();
+  return new Date(formationDate).getUTCMonth();
 }
 
-export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
+export function generateComplianceTasks(
+  llc: LLCProfile,
+  now = new Date()
+): TaskSeed[] {
   const tasks: TaskSeed[] = [];
-  const taxYear = getCurrentTaxYear();
-  const scope = assessOwnershipScope(llc);
-  const isForeignOwned = (llc.foreignOwnerCount ?? 0) > 0;
+  const taxYear = Math.max(
+    currentFilingTaxYear(now),
+    Number(llc.formationDate?.slice(0, 4)) || 0
+  );
+  const scope = assessFederalTaxFiling({ ...llc, name: "" }, { taxYear });
 
   // ─── Federal: Form 5472 + pro-forma 1120 ───────────────────
   // Required for foreign-owned disregarded entities
@@ -73,7 +74,7 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
       description:
         "A foreign-owned U.S. disregarded entity generally files Form 5472 attached to a pro-forma Form 1120 when it had a reportable owner or related-party transaction. Formation, contributions, distributions, loans, and owner-paid expenses can be reportable.",
       category: "federal_tax",
-      dueDate: nextDueDate(3, 15), // April 15
+      dueDate: scope.dueDate!,
       recurring: true,
       recurrenceRule: "YEARLY",
     });
@@ -86,7 +87,7 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
       description:
         "Multi-member LLCs taxed as partnerships must file Form 1065 and issue Schedule K-1 to each partner.",
       category: "federal_tax",
-      dueDate: nextDueDate(2, 15), // March 15
+      dueDate: scope.dueDate!,
       recurring: true,
       recurrenceRule: "YEARLY",
     });
@@ -98,15 +99,15 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
     description:
       "If your LLC has signature authority over foreign bank accounts exceeding $10,000 in aggregate, you may need to file FinCEN 114 (FBAR). Automatic extension to October 15.",
     category: "federal_tax",
-    dueDate: nextDueDate(3, 15), // April 15 (auto-extended to Oct 15)
+    dueDate: calendarYearFilingDeadline(taxYear, 4),
     recurring: true,
     recurrenceRule: "YEARLY",
   });
 
   // ─── EIN Application ──────────────────────────────────────
   if (llc.einStatus === "pending" || llc.einStatus === "not_needed") {
-    const thirtyDays = new Date();
-    thirtyDays.setDate(thirtyDays.getDate() + 30);
+    const thirtyDays = new Date(now);
+    thirtyDays.setUTCDate(thirtyDays.getUTCDate() + 30);
     tasks.push({
       title: "Apply for EIN (Employer Identification Number)",
       description:
@@ -130,7 +131,7 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
       description:
         "Review and pay the Wyoming annual report license tax. It is generally due on the first day of the LLC's anniversary month. Pax provides a reminder only and does not submit the state filing.",
       category: "annual_report",
-      dueDate: nextDueDate(reportMonth, 1),
+      dueDate: nextDueDate(reportMonth, 1, now),
       recurring: true,
       recurrenceRule: "YEARLY",
     });
@@ -149,37 +150,20 @@ export function generateComplianceTasks(llc: LLCProfile): TaskSeed[] {
     });
   }
 
-  // ─── BOI Report (Beneficial Ownership Information) ─────────
-  if (isForeignOwned && llc.formationDate) {
-    const formed = new Date(llc.formationDate);
-    const boiDeadline = new Date(formed);
-    boiDeadline.setDate(boiDeadline.getDate() + 90);
-
-    const now = new Date();
-
-    if (boiDeadline > now) {
-      tasks.push({
-        title: "File BOI Report (Beneficial Ownership Information)",
-        description:
-          "Foreign reporting companies may need to file a Beneficial Ownership Information report with FinCEN. Confirm that your entity still falls within the current BOI rules before filing.",
-        category: "boi_report",
-        dueDate: boiDeadline.toISOString().split("T")[0],
-        recurring: false,
-        recurrenceRule: null,
-      });
-    }
-  }
+  // Foreign ownership alone does not make a domestic LLC a foreign reporting company.
 
   return tasks;
 }
 
-type ComplianceTaskWriter = Pick<typeof db, "insert">;
+type ComplianceTaskWriter = Pick<typeof db, "insert" | "select">;
 
 export async function seedComplianceTasks(
   llcId: string,
   llc: LLCProfile,
   database: ComplianceTaskWriter = db
-) {
+): Promise<(typeof complianceTasks.$inferSelect)[]> {
+  if (database === db)
+    return db.transaction((tx) => seedComplianceTasks(llcId, llc, tx));
   const tasks = generateComplianceTasks(llc);
 
   if (tasks.length === 0) return [];
@@ -188,6 +172,7 @@ export async function seedComplianceTasks(
     .insert(complianceTasks)
     .values(
       tasks.map((t) => ({
+        id: `seed:${llcId}:${t.title}:${t.dueDate}`,
         llcId,
         title: t.title,
         description: t.description,
@@ -203,7 +188,20 @@ export async function seedComplianceTasks(
         }),
       }))
     )
+    .onConflictDoNothing()
     .returning();
+
+  const [owner] = await database
+    .select({ userId: llcs.userId })
+    .from(llcs)
+    .where(eq(llcs.id, llcId));
+
+  if (owner)
+    await scheduleTaskReminders(
+      inserted.map((task) => task.id),
+      owner.userId,
+      database
+    );
 
   return inserted;
 }

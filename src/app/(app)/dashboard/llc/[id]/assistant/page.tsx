@@ -22,6 +22,12 @@ type AssistantLlcResponse = SecureLlcPayload & {
   encryptedData: CipherPayload | null;
 };
 
+const SECURE_CONTEXT_MESSAGES = {
+  locked: "Unlock the vault before asking Pax to use this entity profile.",
+  error: "The entity profile could not be loaded. Refresh and try again.",
+  loading: "Wait for the entity profile to finish loading.",
+};
+
 export default function AssistantPage() {
   const { id: llcId } = useParams<{ id: string }>();
 
@@ -41,12 +47,25 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [messageError, setMessageError] = useState<string | null>(null);
   const [gateMessage, setGateMessage] = useState<string | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const streamController = useRef<AbortController | null>(null);
+  const threadController = useRef<AbortController | null>(null);
+  const navigationVersion = useRef(0);
+
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+      threadController.current?.abort();
+    },
+    []
+  );
 
   const normalizeMessages = useCallback(
     (
@@ -68,6 +87,12 @@ export default function AssistantPage() {
 
   const selectConversation = useCallback(
     async (id: string) => {
+      navigationVersion.current += 1;
+      streamController.current?.abort();
+      threadController.current?.abort();
+      const controller = new AbortController();
+      threadController.current = controller;
+      setIsLoading(false);
       setLoadingMessages(true);
       setMessageError(null);
       setGateMessage(null);
@@ -75,6 +100,7 @@ export default function AssistantPage() {
       try {
         const res = await fetch(`/api/assistant/conversations/${id}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -88,6 +114,7 @@ export default function AssistantPage() {
         // SAFETY: the thread endpoint returns messages written by
         // assistant-store, whose roles are the "user" | "assistant" union.
         const data = (await res.json()) as {
+          hasMore: boolean;
           messages: Array<{
             id: string;
             role: "user" | "assistant";
@@ -96,14 +123,17 @@ export default function AssistantPage() {
           }>;
         };
 
+        if (controller.signal.aborted) return;
         setConversationId(id);
         setMessages(normalizeMessages(data.messages));
+        setHasOlderMessages(data.hasMore);
       } catch (error) {
+        if (controller.signal.aborted) return;
         setMessageError(
           error instanceof Error ? error.message : "Unable to load thread"
         );
       } finally {
-        setLoadingMessages(false);
+        if (!controller.signal.aborted) setLoadingMessages(false);
       }
     },
     [normalizeMessages]
@@ -111,6 +141,7 @@ export default function AssistantPage() {
 
   const loadConversations = useCallback(
     async (options?: { selectLatest?: boolean }) => {
+      const version = navigationVersion.current;
       setLoadingThreads(true);
       setThreadError(null);
 
@@ -132,14 +163,14 @@ export default function AssistantPage() {
         const data = (await res.json()) as Conversation[];
         setConversations(data);
 
-        if (options?.selectLatest && data[0]) {
+        if (
+          options?.selectLatest &&
+          data[0] &&
+          version === navigationVersion.current
+        ) {
           await selectConversation(data[0].id);
 
           return;
-        }
-
-        if (!conversationId && data[0]) {
-          await selectConversation(data[0].id);
         }
       } catch (error) {
         setThreadError(
@@ -149,11 +180,11 @@ export default function AssistantPage() {
         setLoadingThreads(false);
       }
     },
-    [conversationId, llcId, selectConversation]
+    [llcId, selectConversation]
   );
 
   useEffect(() => {
-    void loadConversations();
+    void loadConversations({ selectLatest: true });
   }, [loadConversations]);
 
   useEffect(() => {
@@ -217,6 +248,12 @@ export default function AssistantPage() {
   }, [encryptionLoading, llcId, masterKey]);
 
   function startNewConversation() {
+    navigationVersion.current += 1;
+    streamController.current?.abort();
+    threadController.current?.abort();
+    setIsLoading(false);
+    setLoadingMessages(false);
+    setHasOlderMessages(false);
     setConversationId(null);
     setMessages([]);
     setMessageError(null);
@@ -225,20 +262,80 @@ export default function AssistantPage() {
     requestAnimationFrame(() => composerRef.current?.focus());
   }
 
+  async function loadOlderMessages() {
+    if (!conversationId || !messages[0] || loadingOlderMessages) return;
+    const version = navigationVersion.current;
+    setLoadingOlderMessages(true);
+
+    try {
+      const response = await fetch(
+        `/api/assistant/conversations/${conversationId}?before=${encodeURIComponent(messages[0].id)}`
+      );
+
+      if (!response.ok) throw new Error("Could not load earlier messages.");
+      const data = await response.json();
+
+      if (version !== navigationVersion.current) return;
+      setMessages((current) => [
+        ...normalizeMessages(data.messages),
+        ...current,
+      ]);
+      setHasOlderMessages(data.hasMore);
+    } catch (error) {
+      if (version === navigationVersion.current)
+        setMessageError(
+          error instanceof Error
+            ? error.message
+            : "Could not load earlier messages."
+        );
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }
+
+  async function refreshSavedTurn(
+    id: string,
+    optimisticIds: string[],
+    version: number
+  ) {
+    const response = await fetch(`/api/assistant/conversations/${id}?limit=2`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) throw new Error("Could not reload the saved answer.");
+    const data = await response.json();
+
+    if (version !== navigationVersion.current) return;
+    const saved = normalizeMessages(data.messages);
+
+    const replaced = new Set([
+      ...optimisticIds,
+      ...saved.map((message) => message.id),
+    ]);
+
+    setMessages((current) => [
+      ...current.filter((message) => !replaced.has(message.id)),
+      ...saved,
+    ]);
+  }
+
   async function handleSend() {
     if (secureContextStatus !== "ready") {
-      setGateMessage(
-        secureContextStatus === "locked"
-          ? "Unlock the vault before asking Pax to use this entity profile."
-          : secureContextStatus === "error"
-            ? "The entity profile could not be loaded. Refresh and try again."
-            : "Wait for the entity profile to finish loading."
-      );
+      setGateMessage(SECURE_CONTEXT_MESSAGES[secureContextStatus]);
 
       return;
     }
 
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || loadingMessages) return;
+
+    const controller = new AbortController();
+    streamController.current = controller;
+    const version = navigationVersion.current;
+
+    const isCurrent = () =>
+      !controller.signal.aborted && version === navigationVersion.current;
+
+    let frame: number | null = null;
 
     setGateMessage(null);
     setMessageError(null);
@@ -262,6 +359,7 @@ export default function AssistantPage() {
     try {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
+        signal: controller.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
@@ -270,6 +368,8 @@ export default function AssistantPage() {
           secureEntityContext,
         }),
       });
+
+      if (!isCurrent()) return;
 
       if (!res.ok) {
         const message = await res.text();
@@ -282,9 +382,7 @@ export default function AssistantPage() {
       nextConversationId =
         res.headers.get("x-conversation-id") ?? conversationId;
 
-      if (nextConversationId) {
-        setConversationId(nextConversationId);
-      }
+      setConversationId(nextConversationId);
 
       const reader = res.body?.getReader();
 
@@ -295,27 +393,49 @@ export default function AssistantPage() {
       const decoder = new TextDecoder();
       let assistantContent = "";
 
+      const flush = () => {
+        frame = null;
+
+        if (!isCurrent()) return;
+        const content = assistantContent;
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === optimisticAssistantId
+              ? { ...message, content }
+              : message
+          )
+        );
+      };
+
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) break;
         assistantContent += decoder.decode(value, { stream: true });
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === optimisticAssistantId
-              ? { ...message, content: assistantContent }
-              : message
-          )
-        );
+
+        if (frame === null) frame = requestAnimationFrame(flush);
       }
 
-      if (nextConversationId) {
-        await loadConversations();
-        await selectConversation(nextConversationId);
-      } else {
-        await loadConversations({ selectLatest: true });
-      }
+      assistantContent += decoder.decode();
+
+      if (frame !== null) cancelAnimationFrame(frame);
+      flush();
+
+      if (!assistantContent.trim())
+        throw new Error(
+          "The AI provider returned no answer. Check Settings and retry."
+        );
+      await loadConversations();
+
+      if (isCurrent() && nextConversationId)
+        await refreshSavedTurn(
+          nextConversationId,
+          [optimisticUserId, optimisticAssistantId],
+          version
+        );
     } catch (error) {
+      if (!isCurrent()) return;
+
       const fallbackMessage =
         error instanceof Error
           ? error.message
@@ -333,21 +453,16 @@ export default function AssistantPage() {
         setMessages((prev) =>
           prev.filter((message) => message.id !== optimisticAssistantId)
         );
-
-        if (nextConversationId) {
-          await selectConversation(nextConversationId);
-        } else if (conversationId) {
-          await selectConversation(conversationId);
-        }
       }
 
-      setMessageError(
-        gateMessageText ??
-          fallbackMessage ??
-          "Sorry, something went wrong. Please try again."
-      );
+      setMessageError(gateMessageText ?? fallbackMessage);
     } finally {
-      setIsLoading(false);
+      if (frame !== null) cancelAnimationFrame(frame);
+
+      if (isCurrent()) setIsLoading(false);
+
+      if (streamController.current === controller)
+        streamController.current = null;
     }
   }
 
@@ -423,6 +538,16 @@ export default function AssistantPage() {
           ) : null}
 
           {/* Messages area or empty state */}
+          {hasOlderMessages ? (
+            <button
+              type="button"
+              className="py-2 text-xs text-muted-foreground"
+              disabled={loadingOlderMessages || isLoading}
+              onClick={() => void loadOlderMessages()}
+            >
+              {loadingOlderMessages ? "Loading…" : "Load earlier messages"}
+            </button>
+          ) : null}
           {!loadingMessages && !hasMessages ? (
             <EmptyState
               composerRef={composerRef}
@@ -440,7 +565,7 @@ export default function AssistantPage() {
           <Composer
             input={input}
             isLoading={isLoading}
-            disabled={secureContextStatus !== "ready"}
+            disabled={secureContextStatus !== "ready" || loadingMessages}
             composerRef={composerRef}
             onChange={setInput}
             onSend={() => void handleSend()}

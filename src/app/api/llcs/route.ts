@@ -215,6 +215,14 @@ export async function POST(request: NextRequest) {
     }
 
     const llc = await db.transaction(async (transaction) => {
+      const [owner] = await transaction
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.id, session.user.id))
+        .for("update");
+
+      if (!owner) throw new Error("Account no longer exists");
+
       const [createdLlc] = await transaction
         .insert(llcs)
         .values({

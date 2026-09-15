@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   BadgeCheck,
@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ import {
   type CipherPayload,
 } from "@/lib/e2ee";
 import { getDocumentIcon } from "@/lib/app-icons";
+import { DOCUMENT_MAX_BYTES } from "@/lib/ai-limits";
 
 type Document = {
   id: string;
@@ -45,6 +47,8 @@ type Document = {
   category: string | null;
   scanStatus: string | null;
   processingStatus?: string | null;
+  analysisConsentAt?: string | null;
+  analysisExpiresAt?: string | null;
   extractedTextStatus?: string | null;
   extractedMetadata?: {
     summary?: string;
@@ -101,6 +105,10 @@ export default function DocumentsPage() {
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const analysisController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => analysisController.current?.abort(), []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
@@ -186,19 +194,47 @@ export default function DocumentsPage() {
   }, [llcId, masterKey]);
 
   useEffect(() => {
-    fetchDocs();
+    void fetchDocs().catch(() => setGateMessage("Could not load documents."));
   }, [fetchDocs]);
 
+  const hasActiveAnalysis = docs.some((doc) =>
+    ["queued", "processing"].includes(doc.processingStatus ?? "")
+  );
+
   useEffect(() => {
-    void fetch(`/api/llcs/${llcId}/notices`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        // SAFETY: the notices endpoint returns NoticeCase rows from the owned
-        // /api/llcs/[id]/notices handler.
-        setNotices(data as NoticeCase[]);
-      })
-      .catch(() => undefined);
-  }, [llcId]);
+    if (!hasActiveAnalysis) return;
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void Promise.all([fetchDocs(), fetchNotices()]).catch(() =>
+          setGateMessage("Could not refresh analysis status.")
+        );
+      }
+    }, 5_000);
+
+    return () => clearInterval(timer);
+  }, [hasActiveAnalysis, fetchDocs, fetchNotices]);
+
+  async function revokeAnalysis(id: string) {
+    if (
+      !confirm(
+        "Remove searchable text and unreviewed analysis? Reviewed notices and filing records remain. Your encrypted vault file will not change."
+      )
+    )
+      return;
+
+    const response = await fetch(`/api/documents/${id}/analysis`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      setGateMessage("Could not remove analysis.");
+
+      return;
+    }
+
+    await Promise.all([fetchDocs(), fetchNotices()]);
+  }
 
   async function handleNoticeAction(
     noticeId: string,
@@ -275,6 +311,13 @@ export default function DocumentsPage() {
 
   async function handleUpload() {
     if (!selectedFile || !masterKey) return;
+
+    if (selectedFile.size > DOCUMENT_MAX_BYTES) {
+      setGateMessage("File too large (max 25 MB).");
+
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -320,20 +363,6 @@ export default function DocumentsPage() {
 
       if (!uploadRes.ok) throw new Error("Upload failed");
 
-      const processRes = await fetch(`/api/documents/${documentId}/process`, {
-        method: "POST",
-      });
-
-      if (!processRes.ok) {
-        const processData = await processRes.json().catch(() => ({
-          error: "Document processing is unavailable right now.",
-        }));
-
-        setGateMessage(
-          processData.error ?? "Document processing is unavailable right now."
-        );
-      }
-
       // 3. Add to list
       setDocs((prev) => [
         {
@@ -343,8 +372,8 @@ export default function DocumentsPage() {
           fileSize: selectedFile.size,
           category,
           scanStatus: "pending",
-          processingStatus: "processing",
-          extractedTextStatus: "processing",
+          processingStatus: "skipped",
+          extractedTextStatus: "skipped",
           createdAt: new Date().toISOString(),
           encryptedMetadata,
           wrappedFileKey: encryptedFile.wrappedFileKey,
@@ -360,6 +389,84 @@ export default function DocumentsPage() {
       alert(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleAnalyze(doc: Document) {
+    if (!masterKey || analyzingId) return;
+
+    if (
+      !confirm(
+        "Analyze this document with AI? Your server and configured AI provider can read the submitted copy. The staging copy is encrypted on storage and expires within 24 hours while the worker is running. Searchable text and analysis remain readable in your database for 30 days, or until you remove them. Reviewed records and backups have separate retention. Provider retention follows its own policy. The vault file stays encrypted. Continue?"
+      )
+    )
+      return;
+    setAnalyzingId(doc.id);
+    setGateMessage(null);
+    const controller = new AbortController();
+    analysisController.current = controller;
+
+    try {
+      const signed = await fetch("/api/documents/presign-download", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: doc.id }),
+      });
+
+      if (!signed.ok)
+        throw new Error("Could not download document for analysis.");
+      const { downloadUrl } = await signed.json();
+      const response = await fetch(downloadUrl, { signal: controller.signal });
+
+      if (!response.ok)
+        throw new Error("Could not download document for analysis.");
+      const blob = await response.blob();
+
+      const readable =
+        doc.wrappedFileKey && doc.fileIv
+          ? await decryptDocumentBlob(
+              masterKey,
+              doc.wrappedFileKey,
+              doc.fileIv,
+              blob
+            )
+          : blob;
+
+      if (controller.signal.aborted) return;
+      const form = new FormData();
+      form.set("consent", "true");
+      form.set(
+        "file",
+        new File([readable], doc.name, {
+          type: doc.fileType ?? "application/octet-stream",
+        })
+      );
+
+      const result = await fetch(`/api/documents/${doc.id}/process`, {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
+
+      if (!result.ok)
+        throw new Error(
+          "Analysis failed. Check the file format and AI provider, then retry."
+        );
+      await Promise.all([fetchDocs(), fetchNotices()]);
+      setGateMessage(
+        "Analysis queued. You can leave this page; the worker will finish it."
+      );
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setGateMessage(
+        error instanceof Error ? error.message : "Analysis failed."
+      );
+    } finally {
+      if (!controller.signal.aborted) setAnalyzingId(null);
+
+      if (analysisController.current === controller)
+        analysisController.current = null;
     }
   }
 
@@ -566,9 +673,9 @@ export default function DocumentsPage() {
                   Notice inbox
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  IRS and state notices extracted from your uploads, plus any
-                  you record by hand. Confirming a notice creates a tracked
-                  response task with reminders.
+                  IRS and state notices from documents you choose to analyze,
+                  plus any you record by hand. Confirming a notice creates a
+                  tracked response task with reminders.
                 </p>
               </div>
               <Button
@@ -666,8 +773,8 @@ export default function DocumentsPage() {
 
             {notices.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No notices yet. Upload a notice document and Pax will extract
-                the details, or record one manually above.
+                No notices yet. Choose Analyze on a notice document to extract
+                its details, or record one manually above.
               </p>
             ) : (
               <div className="space-y-3">
@@ -780,6 +887,34 @@ export default function DocumentsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 self-end sm:self-auto">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={
+                        !unlocked ||
+                        analyzingId !== null ||
+                        ["queued", "processing"].includes(
+                          doc.processingStatus ?? ""
+                        )
+                      }
+                      onClick={() => void handleAnalyze(doc)}
+                    >
+                      {analyzingId === doc.id ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1 h-4 w-4" />
+                      )}
+                      Analyze
+                    </Button>
+                    {doc.analysisConsentAt ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void revokeAnalysis(doc.id)}
+                      >
+                        Remove analysis
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="sm"

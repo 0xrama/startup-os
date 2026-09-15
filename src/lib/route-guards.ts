@@ -28,3 +28,25 @@ export async function requireApiLlcAccess(userId: string, llcId: string) {
 
   return { access };
 }
+
+export async function requireRecentApiContext() {
+  const context = await requireApiContext();
+
+  if ("response" in context) return context;
+
+  const createdAt = new Date(context.session.session.createdAt).getTime();
+
+  if (!Number.isFinite(createdAt) || Date.now() - createdAt > 15 * 60_000) {
+    return {
+      response: NextResponse.json(
+        {
+          error:
+            "Sign out and sign in again before changing secrets or deleting your account.",
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return context;
+}

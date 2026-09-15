@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { logAudit } from "@/lib/audit";
 import { eq } from "drizzle-orm";
 import { requireApiContext, requireApiLlcAccess } from "@/lib/route-guards";
+import { DOCUMENT_MAX_BYTES } from "@/lib/ai-limits";
 
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -15,8 +16,6 @@ const ALLOWED_TYPES = [
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
-
-const MAX_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(request: NextRequest) {
   const context = await requireApiContext();
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (fileSize > MAX_SIZE) {
+  if (fileSize > DOCUMENT_MAX_BYTES) {
     return NextResponse.json(
       { error: "File too large (max 25MB)" },
       { status: 400 }
@@ -88,6 +87,8 @@ export async function POST(request: NextRequest) {
       fileSize: hasEncryption ? null : fileSize,
       category: hasEncryption ? "encrypted" : category || "other",
       scanStatus: "pending",
+      processingStatus: hasEncryption ? "skipped" : "pending",
+      extractedTextStatus: hasEncryption ? "skipped" : "pending",
       encryptedMetadata: encryptedMetadata ?? null,
       wrappedFileKey: wrappedFileKey ?? null,
       fileIv: fileIv ?? null,

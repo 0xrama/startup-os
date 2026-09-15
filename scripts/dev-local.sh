@@ -8,7 +8,6 @@ COMPOSE_FILE="$REPO_ROOT/docker-compose.local.yml"
 APP_URL="${PAX_LOCAL_URL:-http://localhost:3001}"
 ACTION="start"
 OPEN_BROWSER=true
-ENABLE_REMINDERS=false
 
 usage() {
   cat <<'EOF'
@@ -23,13 +22,11 @@ Commands:
 
 Options:
   --no-open       Do not open the browser after startup
-  --reminders     Start the optional reminder scheduler
   -h, --help      Show this help
 
 Examples:
   pnpm dev:docker
   pnpm dev:docker -- --no-open
-  pnpm dev:docker -- --reminders
   bash scripts/dev-local.sh restart
 EOF
 }
@@ -43,9 +40,6 @@ for argument in "$@"; do
       ;;
     --no-open)
       OPEN_BROWSER=false
-      ;;
-    --reminders)
-      ENABLE_REMINDERS=true
       ;;
     -h|--help)
       usage
@@ -75,10 +69,6 @@ if [[ ! -f "$COMPOSE_FILE" ]]; then
 fi
 
 compose=(docker compose -f "$COMPOSE_FILE")
-
-if [[ "$ENABLE_REMINDERS" == true ]]; then
-  compose+=(--profile reminders)
-fi
 
 show_status() {
   "${compose[@]}" ps

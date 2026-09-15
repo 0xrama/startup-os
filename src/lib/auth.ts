@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
 import * as schema from "./schema";
+import { sendEmail } from "./email";
 
 function isNonEmptyString(value: string | null | undefined): value is string {
   return value !== null && value !== undefined && value.trim().length > 0;
@@ -86,6 +87,15 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url, token }) => {
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your Pax password",
+        text: `Use this link to reset your password:\n${url}\n\nIf you did not request this, ignore this email. Your vault passphrase is separate and cannot be recovered by this reset.`,
+        idempotencyKey: `password-reset:${token}`,
+      });
+    },
   },
   socialProviders: {
     google: {

@@ -12,9 +12,9 @@ NEXT_PUBLIC_APP_URL = "https://startup-os.example.com"
 BETTER_AUTH_URL = "https://startup-os.example.com"
 
 # Reminder scheduling: the worker's `scheduled` handler calls the internal
-# reminder endpoints. `enqueue-due` builds the queue, `process` delivers it.
+# reminder endpoint. Delivery runs in the separate Node worker.
 [triggers]
-crons = ["0 * * * *", "*/15 * * * *"]
+crons = ["*/15 * * * *"]
 
 
 # Hyperdrive gives Workers a pooled connection to Postgres (Neon, Supabase,

@@ -9,10 +9,12 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    exclude: ["tests/database/**"],
     coverage: {
       enabled: true,
       include: [
         "src/app/api/health/route.ts",
+        "src/lib/health-check.ts",
         "src/lib/internal-auth.ts",
         "src/lib/request-context.ts",
       ],

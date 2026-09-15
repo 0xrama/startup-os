@@ -33,7 +33,13 @@ export default async function LLCOverviewPage({
     .from(complianceTasks)
     .where(eq(complianceTasks.llcId, id));
 
-  const docs = await db.select().from(documents).where(eq(documents.llcId, id));
+  const docs = await db
+    .select({
+      name: documents.name,
+      category: documents.category,
+    })
+    .from(documents)
+    .where(eq(documents.llcId, id));
 
   const notices = await db
     .select({

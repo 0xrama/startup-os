@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    image: pax-self-hosted:local
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 768m
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  worker:
+    image: pax-self-hosted:local
+    restart: unless-stopped
+    env_file: .env.production
+    command: ["node", "--import", "tsx", "scripts/worker.ts"]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 64
+    init: true
+    stop_grace_period: 5m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  migrate:
+    image: pax-self-hosted:local
+    env_file: .env.production
+    command: ["pnpm", "db:migrate"]
+    profiles: [maintenance]

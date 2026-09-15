@@ -4,6 +4,7 @@ import { BookOpen, FileText, Sparkles } from "lucide-react";
 import { motion } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import type { Message } from "./types";
+import { memo } from "react";
 
 function SourceIcon({ type }: { type: string }) {
   if (type === "irs" || type === "state") {
@@ -18,7 +19,10 @@ type MessageBubbleProps = {
   isLoading: boolean;
 };
 
-export function MessageBubble({ message, isLoading }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  isLoading,
+}: MessageBubbleProps) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 8 }}
@@ -119,4 +123,4 @@ export function MessageBubble({ message, isLoading }: MessageBubbleProps) {
       )}
     </motion.article>
   );
-}
+});

@@ -18,13 +18,14 @@ export function MessageList({
 }: MessageListProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const hasMessages = messages.length > 0;
+  const lastMessage = messages.at(-1);
 
   useEffect(() => {
     const viewport = viewportRef.current;
 
     if (!viewport) return;
     viewport.scrollTop = viewport.scrollHeight;
-  }, [messages, isLoading]);
+  }, [lastMessage, isLoading]);
 
   return (
     <div ref={viewportRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -55,7 +56,7 @@ export function MessageList({
             <MessageBubble
               key={message.id}
               message={message}
-              isLoading={isLoading}
+              isLoading={isLoading && message === messages[messages.length - 1]}
             />
           ))}
         </div>

@@ -1,0 +1,1 @@
+CREATE INDEX "jobs_kind_target_idx" ON "jobs" USING btree ("kind","target_id");

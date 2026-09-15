@@ -22,11 +22,16 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const messages = await getConversationMessages(conversation.id);
+    const search = new URL(request.url).searchParams;
+
+    const page = await getConversationMessages(conversation.id, {
+      before: search.get("before") ?? undefined,
+      limit: Number(search.get("limit") ?? 100),
+    });
 
     return NextResponse.json({
       conversation,
-      messages,
+      ...page,
     });
   } catch (error) {
     return NextResponse.json(

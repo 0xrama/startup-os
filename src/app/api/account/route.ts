@@ -1,91 +1,13 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import {
-  user,
-  session,
-  account,
-  llcs,
-  documents,
-  complianceTasks,
-  reminders,
-  chatConversations,
-  chatMessages,
-  auditLogs,
-  userEncryption,
-  noticeCases,
-} from "@/lib/schema";
+import { requireRecentApiContext } from "@/lib/route-guards";
+import { deleteAccount } from "@/modules/identity/delete-account";
 
 export async function DELETE() {
-  const sess = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const context = await requireRecentApiContext();
 
-  if (!sess) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if ("response" in context) return context.response;
 
-  const userId = sess.user.id;
+  await deleteAccount(context.session.user.id);
 
-  // Get user's LLC IDs for cascading deletes
-  const userLlcs = await db
-    .select({ id: llcs.id })
-    .from(llcs)
-    .where(eq(llcs.userId, userId));
-
-  const llcIds = userLlcs.map((l) => l.id);
-
-  // Get user's conversation IDs
-  const userConvos = await db
-    .select({ id: chatConversations.id })
-    .from(chatConversations)
-    .where(eq(chatConversations.userId, userId));
-
-  const convoIds = userConvos.map((c) => c.id);
-
-  await db.transaction(async (tx) => {
-    // Delete chat messages
-    if (convoIds.length > 0) {
-      await tx
-        .delete(chatMessages)
-        .where(inArray(chatMessages.conversationId, convoIds));
-    }
-
-    await tx
-      .delete(chatConversations)
-      .where(eq(chatConversations.userId, userId));
-
-    if (llcIds.length > 0) {
-      // Delete notice cases
-      await tx.delete(noticeCases).where(inArray(noticeCases.llcId, llcIds));
-
-      // Delete reminders (via compliance tasks)
-      const taskRows = await tx
-        .select({ id: complianceTasks.id })
-        .from(complianceTasks)
-        .where(inArray(complianceTasks.llcId, llcIds));
-
-      const taskIds = taskRows.map((t) => t.id);
-
-      if (taskIds.length > 0) {
-        await tx.delete(reminders).where(inArray(reminders.taskId, taskIds));
-      }
-
-      await tx
-        .delete(complianceTasks)
-        .where(inArray(complianceTasks.llcId, llcIds));
-      await tx.delete(documents).where(inArray(documents.llcId, llcIds));
-    }
-
-    await tx.delete(llcs).where(eq(llcs.userId, userId));
-    await tx.delete(auditLogs).where(eq(auditLogs.userId, userId));
-    await tx.delete(userEncryption).where(eq(userEncryption.userId, userId));
-    await tx.delete(session).where(eq(session.userId, userId));
-    await tx.delete(account).where(eq(account.userId, userId));
-    await tx.delete(user).where(eq(user.id, userId));
-  });
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, storageCleanup: "queued" });
 }

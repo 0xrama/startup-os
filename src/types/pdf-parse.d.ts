@@ -1,5 +1,6 @@
 declare module "pdf-parse" {
   export default function pdfParse(
-    dataBuffer: Buffer
+    dataBuffer: Buffer,
+    options?: { max?: number }
   ): Promise<{ text: string }>;
 }

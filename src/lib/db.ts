@@ -16,11 +16,23 @@ function getConnectionString() {
 }
 
 function createDb() {
+  const configuredMax = Number(process.env.DATABASE_POOL_MAX ?? 3);
+
+  if (
+    !Number.isInteger(configuredMax) ||
+    configuredMax < 1 ||
+    configuredMax > 20
+  ) {
+    throw new Error("DATABASE_POOL_MAX must be an integer between 1 and 20.");
+  }
+
   const pool = new Pool({
     connectionString: getConnectionString(),
-    max: 10,
+    max: configuredMax,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
+    statement_timeout: 30_000,
+    query_timeout: 35_000,
   });
 
   return drizzle(pool, { schema });

@@ -76,6 +76,9 @@ function LoginPageContent() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        <Link href="/recover" className="text-sm underline">
+          Forgot your password?
+        </Link>
         {error && (
           <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
             {error}

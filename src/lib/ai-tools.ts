@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { db } from "./db";
 import { complianceTasks, documents } from "./schema";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte, ne, or, isNull, gt } from "drizzle-orm";
 import { getLlcAccess } from "./access";
 import { getVisibleTasks } from "./compliance-task-details";
 import {
@@ -14,14 +14,33 @@ import { assessFederalTaxFiling, classify5472Transaction } from "./tax-copilot";
 import { assessLlcWellness, getEinFaxGuide } from "./llc-wellness";
 import { createOperatingAgreementDraft } from "./operating-agreement";
 import type { SecureLlcPayload } from "./secure-llc";
+import { seedOfficialKnowledge } from "./official-knowledge";
 
 type SecureEntityContext = Partial<SecureLlcPayload>;
 
 export function createAssistantTools(
   userId: string,
   llcId?: string,
-  secureEntityContext?: SecureEntityContext
+  secureEntityContext?: SecureEntityContext,
+  initialAccess?: Awaited<ReturnType<typeof getLlcAccess>>
 ) {
+  // Tool calls in one answer often ask for the same profile.
+  const accessById = new Map<string, ReturnType<typeof getLlcAccess>>();
+
+  if (llcId && initialAccess)
+    accessById.set(llcId, Promise.resolve(initialAccess));
+
+  function getAccess(id: string) {
+    let access = accessById.get(id);
+
+    if (!access) {
+      access = getLlcAccess(userId, id);
+      accessById.set(id, access);
+    }
+
+    return access;
+  }
+
   return {
     getLlcProfile: tool({
       description:
@@ -37,7 +56,7 @@ export function createAssistantTools(
 
         if (!id) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, id);
+        const access = await getAccess(id);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
@@ -56,10 +75,16 @@ export function createAssistantTools(
           einStatus: llc.einStatus,
           taxYearEnd: llc.taxYearEnd,
           formationDate: llc.formationDate,
-          registeredAgent: llc.registeredAgent,
+          registeredAgent:
+            id === llcId
+              ? (secureEntityContext?.registeredAgent ?? llc.registeredAgent)
+              : llc.registeredAgent,
           raRenewalDate: llc.raRenewalDate,
-          members: secureEntityContext?.members ?? llc.members,
-          ein: secureEntityContext?.ein ?? llc.ein,
+          members:
+            id === llcId
+              ? (secureEntityContext?.members ?? llc.members)
+              : llc.members,
+          ein: id === llcId ? (secureEntityContext?.ein ?? llc.ein) : llc.ein,
           wellnessProfile: llc.wellnessProfile,
         };
       },
@@ -67,37 +92,78 @@ export function createAssistantTools(
 
     getUpcomingTasks: tool({
       description:
-        "Get upcoming compliance tasks and deadlines for the user's LLC. Returns tasks sorted by due date.",
+        "Get compliance tasks sorted by due date, up to 30 per page. Use date filters for a specific period and follow nextCursor when hasMore is true. A page can be empty when its tasks are hidden.",
       inputSchema: z.object({
         llcId: z.string().optional(),
         includeCompleted: z.boolean().optional().default(false),
+        dueFrom: z.iso.date().optional(),
+        dueThrough: z.iso.date().optional(),
+        cursor: z.object({ dueDate: z.iso.date(), id: z.string() }).optional(),
       }),
-      execute: async ({ llcId: targetId, includeCompleted }) => {
+      execute: async ({
+        llcId: targetId,
+        includeCompleted,
+        dueFrom,
+        dueThrough,
+        cursor,
+      }) => {
         const id = targetId || llcId;
 
         if (!id) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, id);
+        const access = await getAccess(id);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
 
-        let tasks = await db
-          .select()
+        const rows = await db
+          .select({
+            id: complianceTasks.id,
+            title: complianceTasks.title,
+            description: complianceTasks.description,
+            category: complianceTasks.category,
+            dueDate: complianceTasks.dueDate,
+            status: complianceTasks.status,
+            recurring: complianceTasks.recurring,
+            metadata: complianceTasks.metadata,
+          })
           .from(complianceTasks)
-          .where(eq(complianceTasks.llcId, id));
+          .where(
+            and(
+              eq(complianceTasks.llcId, id),
+              includeCompleted
+                ? undefined
+                : or(
+                    isNull(complianceTasks.status),
+                    ne(complianceTasks.status, "completed")
+                  ),
+              dueFrom ? gte(complianceTasks.dueDate, dueFrom) : undefined,
+              dueThrough ? lte(complianceTasks.dueDate, dueThrough) : undefined,
+              cursor
+                ? or(
+                    gt(complianceTasks.dueDate, cursor.dueDate),
+                    and(
+                      eq(complianceTasks.dueDate, cursor.dueDate),
+                      gt(complianceTasks.id, cursor.id)
+                    )
+                  )
+                : undefined
+            )
+          )
+          .orderBy(complianceTasks.dueDate, complianceTasks.id)
+          .limit(31);
 
-        tasks = getVisibleTasks(tasks);
-
-        if (!includeCompleted) {
-          tasks = tasks.filter((t) => t.status !== "completed");
-        }
-
-        tasks.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+        const page = rows.slice(0, 30);
+        const last = page.at(-1);
 
         return {
           llcName: llc.name,
-          tasks: tasks.map((t) => ({
+          hasMore: rows.length > 30,
+          nextCursor:
+            rows.length > 30 && last
+              ? { dueDate: last.dueDate, id: last.id }
+              : null,
+          tasks: getVisibleTasks(page).map((t) => ({
             title: t.title,
             description: t.description,
             category: t.category,
@@ -135,27 +201,12 @@ export function createAssistantTools(
 
         if (!id) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, id);
+        const access = await getAccess(id);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
 
-        let docs = query
-          ? await getDocumentSearchResults(id, query)
-          : await db.select().from(documents).where(eq(documents.llcId, id));
-
-        if (category) {
-          docs = docs.filter((d) => d.category === category);
-        }
-
-        if (query) {
-          const q = query.toLowerCase();
-          docs = docs.filter(
-            (d) =>
-              d.name.toLowerCase().includes(q) ||
-              d.description?.toLowerCase().includes(q)
-          );
-        }
+        const docs = await getDocumentSearchResults(id, query, category);
 
         return {
           llcName: llc.name,
@@ -165,8 +216,9 @@ export function createAssistantTools(
             category: d.category,
             taxYear: d.taxYear,
             uploadedAt: d.createdAt?.toISOString(),
-            summary: d.extractedMetadata?.summary,
+            summary: d.summary,
           })),
+          resultLimit: 20,
         };
       },
     }),
@@ -182,10 +234,12 @@ export function createAssistantTools(
         const id = targetId || llcId;
 
         if (id) {
-          const access = await getLlcAccess(userId, id);
+          const access = await getAccess(id);
 
           if (!access?.llc) return { error: "LLC not found" };
         }
+
+        await seedOfficialKnowledge();
 
         const results = await searchKnowledgeBase({
           query,
@@ -210,7 +264,7 @@ export function createAssistantTools(
       execute: async () => {
         if (!llcId) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, llcId);
+        const access = await getAccess(llcId);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
@@ -254,7 +308,7 @@ export function createAssistantTools(
       execute: async ({ principalPlaceOfBusiness }) => {
         if (!llcId) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, llcId);
+        const access = await getAccess(llcId);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
@@ -281,7 +335,7 @@ export function createAssistantTools(
       execute: async ({ businessPurpose }) => {
         if (!llcId) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, llcId);
+        const access = await getAccess(llcId);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
@@ -315,7 +369,7 @@ export function createAssistantTools(
       execute: async ({ taxYear }) => {
         if (!llcId) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, llcId);
+        const access = await getAccess(llcId);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };
@@ -341,7 +395,7 @@ export function createAssistantTools(
       execute: async ({ description, direction }) => {
         if (!llcId) return { error: "No LLC specified" };
 
-        const access = await getLlcAccess(userId, llcId);
+        const access = await getAccess(llcId);
         const llc = access?.llc;
 
         if (!llc) return { error: "LLC not found" };

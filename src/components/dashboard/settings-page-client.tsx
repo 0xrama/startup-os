@@ -5,6 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OperationsPanel } from "./operations-panel";
 
 type SettingsResponse = {
   aiBaseUrl: string;
@@ -93,9 +94,9 @@ export function SettingsPageClient() {
       <div className="card-warm p-6 sm:p-8">
         <h2 className="font-semibold mb-1">AI provider</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Any OpenAI-compatible endpoint works, including OpenAI, Azure OpenAI,
-          OpenRouter, or a local server such as Ollama. The key is stored in
-          this instance&apos;s own database.
+          Use an endpoint supporting OpenAI-compatible chat completions, tool
+          calls, and structured output. Provider compatibility must be tested.
+          Saved keys are encrypted with your server encryption key.
         </p>
 
         {loading ? (
@@ -182,6 +183,7 @@ export function SettingsPageClient() {
           </form>
         )}
       </div>
+      <OperationsPanel />
     </div>
   );
 }

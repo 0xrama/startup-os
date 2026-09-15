@@ -17,7 +17,7 @@
     "Session"
   ],
   "next": {
-    "entry": "src/app/**/*.{ts,tsx}",
-    "project": "src/**/*.{ts,tsx}"
+    "entry": ["src/app/**/*.{ts,tsx}", "scripts/**/*.{mjs,ts}"],
+    "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,ts}"]
   }
 }

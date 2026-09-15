@@ -4,7 +4,7 @@
  * Owns two things the bare vinext router does not:
  *   1. Image optimization via the Cloudflare Images binding (/_vinext/image).
  *   2. The `scheduled` handler that cron triggers call to run reminder
- *      enqueue/process (see wrangler.toml [triggers]).
+ *      enqueue (see wrangler.toml [triggers]).
  *
  * This file is checked in and maintained by hand — it is NOT auto-generated.
  * wrangler.toml `main` must point here. If you delete this file, deploys lose
@@ -57,10 +57,7 @@ interface Env {
   };
 }
 
-const CRON_ENDPOINTS = [
-  "/api/internal/reminders/enqueue-due",
-  "/api/internal/reminders/process",
-];
+const CRON_ENDPOINT = "/api/internal/reminders/enqueue-due";
 
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
@@ -118,14 +115,12 @@ const worker = {
 
     const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://internal";
 
-    await Promise.all(
-      CRON_ENDPOINTS.map((path) =>
-        handler.fetch(
-          new Request(`${origin}${path}?secret=${encodeURIComponent(secret)}`),
-          env,
-          ctx
-        )
-      )
+    await handler.fetch(
+      new Request(
+        `${origin}${CRON_ENDPOINT}?secret=${encodeURIComponent(secret)}`
+      ),
+      env,
+      ctx
     );
   },
 };

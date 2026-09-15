@@ -36,6 +36,55 @@
       "when": 1789375739142,
       "tag": "0004_silky_lila_cheney",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789407882278,
+      "tag": "0005_performance_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789408638655,
+      "tag": "0006_document_knowledge_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789416964436,
+      "tag": "0007_production_jobs_and_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789450867108,
+      "tag": "0008_analysis_retention_upgrade",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789453862012,
+      "tag": "0009_needy_dark_phoenix",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789456194694,
+      "tag": "0010_curvy_red_shift",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789456245224,
+      "tag": "0011_amazing_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

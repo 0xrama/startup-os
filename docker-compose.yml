@@ -2,13 +2,16 @@ services:
   app:
     image: node:22
     working_dir: /workspace
-    environment:
+    environment: &app-environment
       NODE_ENV: development
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       BETTER_AUTH_URL: http://localhost:3000
       BETTER_AUTH_SECRET: local-development-secret-change-me
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pax
       INTERNAL_CRON_SECRET: local-development-secret-change-me
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      SMTP_URL: smtp://mailpit:1025
+      EMAIL_FROM: Pax <pax@example.test>
       FEATURE_ASSISTANT_RETRIEVAL: "false"
       FEATURE_REQUEST_METRICS: "true"
       R2_ENDPOINT: http://minio:9000
@@ -33,21 +36,22 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-  # Drives the internal reminder endpoints every 15 minutes, mirroring the
-  # Vercel/Cloudflare cron schedules. Requires INTERNAL_CRON_SECRET above.
-  cron:
-    image: curlimages/curl:latest
+  worker:
+    image: node:22
+    working_dir: /workspace
+    environment: *app-environment
     restart: unless-stopped
+    init: true
+    mem_limit: 512m
+    stop_grace_period: 5m
+    volumes:
+      - .:/workspace:ro
+      - app_node_modules:/workspace/node_modules:ro
     depends_on:
       - app
-    entrypoint: >-
-      sh -c "while true; do
-        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://app:3000/api/internal/reminders/enqueue-due >/dev/null || true;
-        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://app:3000/api/internal/reminders/process >/dev/null || true;
-        sleep 900;
-      done"
-    environment:
-      INTERNAL_CRON_SECRET: local-development-secret-change-me
+    command: >-
+      sh -c "until test -f node_modules/tsx/package.json; do sleep 2; done;
+      exec node --import tsx scripts/worker.ts"
   postgres:
     image: postgres:16
     environment:

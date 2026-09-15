@@ -6,6 +6,7 @@ import { FileText, CheckCircle2, Clock } from "lucide-react";
 import { requirePageLlcAccess } from "@/lib/access";
 import { TaxCopilotSummary } from "@/components/dashboard/tax-copilot-summary";
 import { FilingPackages } from "@/components/dashboard/filing-packages";
+import { FilingReview } from "@/components/dashboard/filing-review";
 
 export default async function FilingsPage({
   params,
@@ -80,6 +81,7 @@ export default async function FilingsPage({
       />
 
       <FilingPackages llcId={id} />
+      <FilingReview llcId={id} />
 
       {tasks.length === 0 ? (
         <div className="card-warm p-12 text-center border border-dashed border-border group">

@@ -71,7 +71,7 @@ services:
     image: node:22-alpine
     init: true
     working_dir: /workspace
-    environment:
+    environment: &local-environment
       NODE_ENV: development
       NODE_OPTIONS: --max-old-space-size=2048
       NEXT_TELEMETRY_DISABLED: "1"
@@ -81,6 +81,9 @@ services:
       BETTER_AUTH_SECRET: local-development-secret-change-me
       INTERNAL_CRON_SECRET: local-development-secret-change-me
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pax
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      SMTP_URL: ${SMTP_URL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Pax <pax@example.test>}
       R2_ENDPOINT: http://minio:9000
       R2_PUBLIC_ENDPOINT: http://localhost:9000
       R2_ACCESS_KEY_ID: localadmin
@@ -133,23 +136,23 @@ services:
     cpus: 2.0
     stop_grace_period: 10s
 
-  cron:
-    image: curlimages/curl:latest
-    profiles: ["reminders"]
+  worker:
+    image: node:22-alpine
+    working_dir: /workspace
+    environment:
+      <<: *local-environment
+      NODE_OPTIONS: --max-old-space-size=256
+    init: true
     restart: unless-stopped
+    mem_limit: 512m
+    stop_grace_period: 5m
     depends_on:
       workspace:
         condition: service_healthy
-    entrypoint: >-
-      sh -c "while true; do
-        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://workspace:3000/api/internal/reminders/enqueue-due >/dev/null || true;
-        curl -sf -H \"x-internal-secret: $$INTERNAL_CRON_SECRET\" http://workspace:3000/api/internal/reminders/process >/dev/null || true;
-        sleep 900;
-      done"
-    environment:
-      INTERNAL_CRON_SECRET: local-development-secret-change-me
-    mem_limit: 64m
-    cpus: 0.25
+    volumes:
+      - .:/workspace:ro
+      - workspace_node_modules:/workspace/node_modules:ro
+    command: ["node", "--import", "tsx", "scripts/worker.ts"]
 
 volumes:
   postgres_data:

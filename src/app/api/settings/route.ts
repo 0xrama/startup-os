@@ -4,14 +4,25 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { appSettings } from "@/lib/schema";
 import { getAiConfig } from "@/lib/ai-config";
-import { requireApiContext } from "@/lib/route-guards";
+import { requireApiContext, requireRecentApiContext } from "@/lib/route-guards";
+import {
+  isSealedText,
+  sealText,
+} from "@/infrastructure/security/server-encryption";
 
 const SINGLETON_ID = "singleton";
 
 const settingsSchema = z.object({
-  aiBaseUrl: z.string().optional(),
-  aiModel: z.string().optional(),
-  aiApiKey: z.string().optional(),
+  aiBaseUrl: z
+    .union([
+      z.literal(""),
+      z
+        .url()
+        .refine((url) => ["http:", "https:"].includes(new URL(url).protocol)),
+    ])
+    .optional(),
+  aiModel: z.string().max(200).optional(),
+  aiApiKey: z.string().max(4096).optional(),
 });
 
 function normalizeOptionalString(value: string | undefined) {
@@ -36,7 +47,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const context = await requireApiContext();
+  const context = await requireRecentApiContext();
 
   if ("response" in context) return context.response;
 
@@ -58,7 +69,13 @@ export async function PUT(request: Request) {
   const values = {
     aiBaseUrl: normalizeOptionalString(parsed.data.aiBaseUrl),
     aiModel: normalizeOptionalString(parsed.data.aiModel),
-    aiApiKey: submittedKey ?? existing?.aiApiKey ?? null,
+    aiApiKey: submittedKey
+      ? sealText(submittedKey)
+      : existing?.aiApiKey
+        ? isSealedText(existing.aiApiKey)
+          ? existing.aiApiKey
+          : sealText(existing.aiApiKey)
+        : null,
     updatedAt: new Date(),
   };
 

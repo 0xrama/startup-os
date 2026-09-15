@@ -5,10 +5,6 @@
     {
       "path": "/api/internal/reminders/enqueue-due",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/internal/reminders/process",
-      "schedule": "*/15 * * * *"
     }
   ]
 }

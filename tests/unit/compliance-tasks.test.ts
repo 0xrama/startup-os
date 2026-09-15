@@ -31,6 +31,17 @@ function federalTitles(profile: Parameters<typeof generateComplianceTasks>[0]) {
 }
 
 describe("generateComplianceTasks federal routing", () => {
+  it("does not seed filing years before formation", () => {
+    const tasks = generateComplianceTasks(
+      { ...baseProfile, formationDate: "2026-02-01" },
+      new Date("2026-02-10T00:00:00Z")
+    );
+
+    expect(tasks.some((task) => task.title.includes("(2025)"))).toBe(false);
+    expect(tasks.find((task) => task.title.includes("5472"))?.dueDate).toBe(
+      "2027-04-15"
+    );
+  });
   it("creates the Form 5472 review only for a foreign-owned disregarded entity", () => {
     const titles = federalTitles(baseProfile);
 

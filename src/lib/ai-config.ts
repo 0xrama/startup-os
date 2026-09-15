@@ -1,7 +1,12 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { appSettings } from "./schema";
+import {
+  isSealedText,
+  openText,
+  sealText,
+} from "@/infrastructure/security/server-encryption";
 
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 
@@ -29,8 +34,25 @@ export async function getAiConfig(): Promise<AiConfig> {
     process.env.AI_BASE_URL?.trim() ||
     DEFAULT_AI_BASE_URL;
 
-  const apiKey =
-    row?.aiApiKey?.trim() || process.env.AI_API_KEY?.trim() || null;
+  const storedKey = row?.aiApiKey?.trim();
+
+  const apiKey = storedKey
+    ? isSealedText(storedKey)
+      ? openText(storedKey)
+      : storedKey
+    : process.env.AI_API_KEY?.trim() || null;
+
+  if (storedKey && !isSealedText(storedKey)) {
+    await db
+      .update(appSettings)
+      .set({ aiApiKey: sealText(storedKey), updatedAt: new Date() })
+      .where(
+        and(
+          eq(appSettings.id, SINGLETON_ID),
+          eq(appSettings.aiApiKey, storedKey)
+        )
+      );
+  }
 
   const model =
     row?.aiModel?.trim() || process.env.AI_MODEL?.trim() || DEFAULT_AI_MODEL;
@@ -56,5 +78,7 @@ export async function getChatModel() {
     apiKey: config.apiKey ?? "not-needed",
   });
 
-  return provider(config.model);
+  // Compatible providers (including local servers) expose chat completions,
+  // not necessarily OpenAI's newer Responses API.
+  return provider.chat(config.model);
 }
